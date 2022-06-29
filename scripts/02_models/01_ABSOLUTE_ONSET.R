@@ -28,7 +28,7 @@ rm(list=ls())
 ##
 ##
 pacman::p_load(openxlsx, 
-               lubridate, dplyr, tidyr, suncalc,
+               lubridate, dplyr, tidyr,
                lme4, performance,
                ggplot2, extrafont)
 loadfonts()
@@ -85,7 +85,8 @@ data %>%
             sd_date = sd(mean_box/sqrt(n())))
 
 ##
-##### models for absolute onset of activity #####
+##
+##### Models for absolute onset of activity #####
 ##
 ##
 

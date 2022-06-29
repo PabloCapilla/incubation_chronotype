@@ -1,39 +1,51 @@
+###
+###
+#' 
+#' Script for:
+#' Reproductive fitness is associated with female chronotype in a songbird
+#' Womack, et al. 
+#' Preprint: 
+#' 
+#' Latest update: 2022-06-28
+#' 
+###
+###
+
+# Clear memory to make sure there are not files loaded that could cause problems
+rm(list=ls())
+
+##
+##
+##### Script aim: #####
+#' Analysis of absolute end of activity
+#' 
+##
+##
+
+##
 ##
 ##### libraries #####
 ##
-pacman::p_load(lubridate, lme4, MuMIn, dplyr, ggplot2, ggridges, extrafont, rptR)
+##
+pacman::p_load(openxlsx, 
+               lubridate, dplyr, tidyr,
+               lme4, performance,
+               ggplot2, extrafont)
 loadfonts()
 
-
-##
-##### functions #####
-##
-substrRight <- function(x, n){
-  substr(x, nchar(x)-n+1, nchar(x))
-}
-
-
-
 ##
 ##
-##### Data sets #####
+##### data #####
 ##
 ##
-data <- read.csv("./data/Full_incubation_reproduction_data_ROBYN_&_CIARA.csv")
-data$sunset_dec <- hour(dmy_hm(data$sunset)) + (minute(dmy_hm(data$sunset))/60)
+data00 <- readRDS("./data/data_incubation.RDS")
+head(data00)
 
-data$box <- substr(as.character(data$box),1,nchar(as.character(data$box))-5) # correct format for box ID
-data <- left_join(x = data, 
-                  y = data %>% 
-                    group_by(year, box) %>% 
-                    summarise(mean_days_april = mean(date_aprildays, na.rm = T)), 
-                  by = c("year", "box")) %>% 
-  filter(day_before_hatch < 0) # very little data on the day of hatching
+##
+## filtering data for end of activity
+##
 
-head(data)
-
-## the observations below were removed from Robyn's and Ciara's analyses. I assume there are 
-## reasons for that, so I remove them too
+## days were females were disturbed before end of activity. Therefore, observations removed from dataset
 box_remove <- c("27KG", "245SAL","32KG","12CASH","425CASH","425CASH","244SAL", "128PEN", "29KG","151FS")
 recording_date_remove <- c("2018-05-14","2018-05-23","2018-05-21",
                            "2018-05-16","2018-05-16","2018-05-23",
@@ -43,147 +55,62 @@ remove_df<- data.frame(box = box_remove, recording_date = recording_date_remove)
 remove_df$box <- as.character(remove_df$box)
 remove_df$recording_date <- as.character(remove_df$recording)
 
-
-##
-## IMPORTANT, REPORT THESE REMOVALS OF DATA AND WHY
-# Ciara's code for Robyn's data set
-data$recording_date <- as.character(data$recording_date)
-data_trimmed <- anti_join(data, remove_df, by=c("box","recording_date"))
-data_trimmed<- data_trimmed[!is.na(data_trimmed$diff_sunset),]
-data_trimmed<- data_trimmed %>% filter(diff_sunset > -300)
-
-
-
-
-
-
+data00$recording_date <- as.character(data00$recording_date)
+data <- anti_join(data00, remove_df, by=c("box","recording_date"))
+data<- data[!is.na(data$activity_end_relative),]
+data<- data %>% filter(activity_end_relative > -300)
 
 
 ##
-## sunrise calculation on the inc start date
-library(suncalc)
-## site coordinates
-# table with coordinates for the different sites
-coor_df <- data.frame(site = c("City", "Forest"),
-                      lat = c(55.868230, 56.130595),
-                      lon = c(-4.282496, -4.614817))
-
-
-# new columns
-data_trimmed$sunrise_inc_start <- ymd_hms(NA)
-data_trimmed$sunset_inc_start <- ymd_hms(NA)
-data_trimmed$dawn_inc_start <- ymd_hms(NA)
-data_trimmed$dusk_inc_start <- ymd_hms(NA)
-
-
-for(i in 1:nrow(data_trimmed)){
-  #add column with dawn and dusk
-  suntimes  <- getSunlightTimes(date = ymd(paste0(data_trimmed$year[i], "-03-31"))+data_trimmed$inc_start_aprildays[i], 
-                                lat = ifelse(data_trimmed$area[i] == "City", coor_df$lat[1], coor_df$lat[2]),
-                                lon = ifelse(data_trimmed$area[i] == "City", coor_df$lon[1], coor_df$lon[2]),
-                                keep = c("dawn", "dusk", "sunrise", "sunset"), 
-                                tz = "GMT")
-  data_trimmed$sunrise_inc_start[i] <- suntimes$sunrise
-  data_trimmed$sunset_inc_start[i] <- suntimes$sunset
-  data_trimmed$dawn_inc_start[i] <- suntimes$dawn
-  data_trimmed$dusk_inc_start[i] <- suntimes$dusk
-}
-
-data_trimmed$sunset_inc_start_dec <- hour(ymd_hms(data_trimmed$sunset_inc_start)) + 
-  (minute(ymd_hms(data_trimmed$sunset_inc_start))/60)
-
-
-plot(sunset_inc_start_dec ~ inc_start_aprildays, data = data_trimmed)
-
-
-
-
-
 ##
-## sample size
-nrow(data) # total data points
+##### Sample sizes and data summary #####
+##
+##
+head(data)
+nrow(data) # total observations
+length(unique(data$box)) # number of nest-boxes included
 
-# data per site and year
+# number of clutches
 data %>% 
-  group_by(year, site) %>% 
-  summarise(n_obs = n())
-
-# number of boxes per site and year
-data %>% 
-  group_by(year, site, box) %>% 
+  group_by(year, box) %>% 
+  filter(row_number() == 1) %>% 
   summarise(n_obs = n()) %>% 
-  group_by(year, site) %>%
-  summarise(n_box = n())
+  nrow()
 
+# days of incubation per clutch
+data %>% 
+  group_by(box,year) %>% 
+  summarise(days_box = n()) %>%
+  ungroup(box) %>% 
+  summarise(min_range = min(days_box),
+            max_range = max(days_box),
+            med = median(days_box))
 
-##
-##### Initial visualisation of data #####
-##
-ggplot(data = data_trimmed, aes(x = diff_sunset)) +
-  geom_histogram() +
-  theme_bw() +
-  labs(x = "Activity onset - sunrise time", y = "Count")
+# number of nest-boxes per site (not clutches)
+data %>% 
+  group_by(site, box) %>% 
+  filter(row_number() == 1) %>% 
+  group_by(site) %>% 
+  summarise(n_boxes = n())
 
-ggplot(data = data_trimmed, aes(y = diff_sunset, x = day_before_hatch, color = area)) +
-  geom_point() +
-  stat_smooth(method = "lm") +
-  theme_bw() +
-  labs(x = "Days before incubation", 
-       y = "End of activity (min after sunset)") +
-  scale_fill_manual(name = "", labels = c("City", "Forest"), 
-                    values = c("#3399CC", "#339900")) +
-  scale_color_manual(name = "", labels = c("City", "Forest"), 
-                     values = c("#3399CC", "#339900")) +
-  geom_text(aes(-2, -15), 
-            label = "Sunset time", vjust = -1, 
-            size = 4,
-            color = "black") 
-
-
-ggplot(data = data_trimmed, 
-       aes(y = last_onbout.1, 
-           x = mean_days_april, 
-           color = area)) +
-  geom_point() +
-  stat_smooth(method = "lm") +
-  theme_bw() 
-
-
-
-
-
-
-ggplot(data = data_trimmed, aes(x = diff_sunset, y = factor(area))) +
-  geom_density_ridges(scale = 0.8, 
-                      alpha = 0.8, 
-                      aes(fill = area)) +
-  theme_bw() +
-  scale_fill_manual(values = c("#8DA0CB", "#5AAE61")) +
-  labs(x = "Last on-bout - sunset time", y = "Count")
-
-
-
-ggplot(data = data_trimmed, aes(x = day_before_hatch, y = date_aprildays, group = box)) +
-  geom_point() +
-  geom_line() +
-  facet_grid(year~area) +
-  theme_bw()
-
-ggplot(data = data_trimmed, aes(x = day_before_hatch, y = mean_days_april, group = box)) +
-  geom_point() +
-  geom_line() +
-  facet_grid(year~area) +
-  theme_bw()
+# mean start of incubation per habitat
+data %>% 
+  group_by(year, area, box) %>% 
+  summarise(mean_box = mean(inc_start_aprildays)) %>% 
+  group_by(area) %>% 
+  summarise(mean_date = mean(mean_box),
+            n_size = n(),
+            sd_date = sd(mean_box/sqrt(n())))
 
 
 ##
 ##
-##### Model for Onset of activity #####
+##### Models for absolute end of activity #####
 ##
 ##
 
 # model fit
-model_end <- lmer(last_onbout.1 ~ 
+model_absolute_end <- lmer(activity_end_abs ~ 
                     area:poly(inc_start_aprildays,2)[,2] + 
                     area:poly(inc_start_aprildays,2)[,1] +  
                     
@@ -202,24 +129,29 @@ model_end <- lmer(last_onbout.1 ~
                     (1|year),
                   REML = F,
                   na.action = "na.fail",
-                  data= data_trimmed) #full model
-summary(model_end)
+                  data= data) 
+summary(model_absolute_end)
 
 # model diagnostics
-plot(model_end)
-hist(residuals(model_end))
+check_model(model_absolute_end, panel = F) # not too bad overall
 
-#repeatability
-as.numeric(summary(model_end)$varcor[1]) / 
-  (as.numeric(summary(model_end)$varcor[1]) + 
-     summary(model_end)$sigma^2)
+# significance of random effects 
+lmerTest::rand(model_absolute_end)
+
+# maternal repeatability of absolute onset of activity
+as.numeric(summary(model_absolute_end)$varcor[1]) / 
+  (as.numeric(summary(model_absolute_end)$varcor[1]) + 
+     as.numeric(summary(model_absolute_end)$varcor[2]) +
+     as.numeric(summary(model_absolute_end)$varcor[3]) +
+     summary(model_absolute_end)$sigma^2)
+
 ##
 ##
 ##### Model selection LRT #####
 ##
 ##
-drop1(model_end, test = "Chisq")
-m1 <- update(model_end, . ~ . - area:poly(inc_start_aprildays, 2)[, 1])
+drop1(model_absolute_end, test = "Chisq")
+m1 <- update(model_absolute_end, . ~ . - area:poly(inc_start_aprildays, 2)[, 1])
 
 #1
 drop1(m1, test = "Chisq")
@@ -248,18 +180,26 @@ m7 <- update(m6, . ~ . - clutch_size)
 #7
 drop1(m7, test = "Chisq")
 
-#mam
+# Final model
 m_mam <- m7
-drop1(m_mam, test = "Chisq")
 summary(m_mam)
 
+# 95%CIs
 CI_onset <- confint(m_mam, 
                     level = 0.95, 
                     method = "boot", 
                     nsim = 500, 
                     boot.type = "norm")
 
-# p for non significant terms
+##
+##
+##### Likelihood-ratio test results #####
+##
+##
+# for effects in final model
+drop1(m_mam, test = "Chisq")
+
+# for effects not in final model
 m_int <- update(m_mam, . ~ . + area:poly(inc_start_aprildays, 2)[, 1])
 anova(m_int, m_mam, test = "Chisq")
 
@@ -277,7 +217,6 @@ m_hatch2_int1 <- update(m_mam, . ~ . + poly(day_before_hatch, 2)[, 2] + poly(day
 m_hatch2_int2 <- update(m_mam, . ~ . + poly(day_before_hatch, 2)[, 2])
 anova(m_hatch2_int1, m_hatch2_int2, test = "Chisq")
 
-
 m_clutch_size <- update(m_mam, . ~ . + clutch_size)
 anova(m_clutch_size, m_mam, test = "Chisq")
 
@@ -285,16 +224,12 @@ m_meantemp <- update(m_mam, . ~ . + meantemp)
 anova(m_meantemp, m_mam, test = "Chisq")
 
 
-
-
-
-
-
 ##
-## predictions plot
-
-# top model for plot
-model_end_plot <- lmer(last_onbout.1 ~ 
+##
+##### Final model results #####
+##
+##
+top_absolute_end <- lmer(activity_end_abs ~ 
                          area:day_before_hatch +  
                          
                          day_before_hatch +
@@ -305,13 +240,18 @@ model_end_plot <- lmer(last_onbout.1 ~
                          (1|year),
                        REML = T,
                        na.action = "na.fail",
-                       data= data_trimmed) 
-r.squaredGLMM(model_end_plot)
+                       data= data) 
 summary(model_end_plot)
 
-##
-## repeatability
-rep_absolute_offset <- rpt(last_onbout.1 ~ 
+# maternal repeatability of absolute end of activity
+as.numeric(summary(top_absolute_end)$varcor[1]) / 
+  ((as.numeric(summary(top_absolute_end)$varcor[1]) + 
+      (as.numeric(summary(top_absolute_end)$varcor[2])) +
+      (as.numeric(summary(top_absolute_end)$varcor[3])) +
+      summary(top_absolute_end)$sigma^2))
+
+# maternal repeatability with 95%CI of absolute end of activity
+rep_absolute_offset <- rpt(activity_end_abs ~ 
                             area:day_before_hatch +  
                             
                             day_before_hatch +
@@ -321,30 +261,24 @@ rep_absolute_offset <- rpt(last_onbout.1 ~
                             (1|box) +
                             (1|year), 
                           grname = "box", 
-                          data = data_trimmed, 
+                          data = data, 
                           datatype = "Gaussian", 
                           nboot = 1000, 
                           npermut = 0)
 
+##
+##
+##### Plot model predictions #####
+##
+##
 
-
-
-CI_onset <- confint(model_end_plot, 
-                    level = 0.95, 
-                    method = "boot", 
-                    nsim = 500, 
-                    boot.type = "norm")
-
-
-
+# new dataframe to predict
 df_pred <- expand.grid(day_before_hatch = seq(min(data$day_before_hatch), 
                                               max(data$day_before_hatch), 1),
                        inc_start_aprildays = seq(min(data$inc_start_aprildays), 
                                              max(data$inc_start_aprildays), 1),
                        area = c("City", "Forest"))
-
-
-df_pred$prediction <- predict(model_end_plot, df_pred, re.form = NA)
+df_pred$prediction <- predict(top_absolute_end, df_pred, re.form = NA)
 
 # plot only data in range
 data %>% 
@@ -369,7 +303,7 @@ mm <- model.matrix(~ area:day_before_hatch +
                    data = df_pred)
 
 ## or newdat$distance <- mm %*% fixef(fm1)
-pvar1 <- diag(mm %*% tcrossprod(vcov(model_end_plot),mm))
+pvar1 <- diag(mm %*% tcrossprod(vcov(top_absolute_end),mm))
 cmult <- 1 ## 1 SE
 df_pred <- data.frame(
   df_pred
@@ -380,15 +314,14 @@ df_pred <- data.frame(
 df_pred$area <- factor(x = ifelse(df_pred$area == "City", "Urban", "Forest"),
                        levels = c("Urban", "Forest"),
                        ordered = T)
-data_trimmed$area <- factor(x = ifelse(data_trimmed$area == "City", "Urban", "Forest"),
+data$area <- factor(x = ifelse(data$area == "City", "Urban", "Forest"),
                             levels = c("Urban", "Forest"),
                             ordered = T)
 
-
-## labels for y axis
+## labels for plot
 library(chron) 
-min_time <- min(times(strftime(dmy_hm(data_trimmed$last_onbout),"%H:%M:%S", tz = "UTC")))
-max_time <- max(times(strftime(dmy_hm(data_trimmed$last_onbout),"%H:%M:%S", tz = "UTC")))
+min_time <- min(times(strftime(dmy_hm(data$last_onbout),"%H:%M:%S", tz = "UTC")))
+max_time <- max(times(strftime(dmy_hm(data$last_onbout),"%H:%M:%S", tz = "UTC")))
 
 hm <- merge(0:23, seq(0, 30, by = 30))
 
@@ -399,12 +332,13 @@ labels_time <- substr(interval_15min[!interval_15min$INTERVAL <= min_time & !int
                       stop = 5)
 
 
-## plot end of activity averaging across April days
-end_plot <- ggplot(data = data_trimmed, 
-                   aes(x = day_before_hatch, 
-                       y = last_onbout.1,
-                       fill = area,
-                       color = area)) +
+## 
+## plot days to hatching - absolute onset
+absolute_end_hatching <- ggplot(data = data, 
+                                aes(x = day_before_hatch, 
+                                    y = activity_end_abs,
+                                    fill = area,
+                                    color = area)) +
   geom_point(position = position_jitterdodge(dodge.width = 0.5,
                                              jitter.width = 0.25),
              alpha = 0.4,
@@ -449,22 +383,21 @@ end_plot <- ggplot(data = data_trimmed,
   scale_color_manual(name = "", labels = c("Urban", "Forest"), 
                      values = c("#af8dc3", "#7fbf7b"))
 
-ggsave(filename = "./plots/1b_End of activity/ABS_end_pred.jpeg", 
-       plot = end_plot, 
-       device = "jpeg", 
+ggsave(filename = "./plots/Figure Relative End Activity.png", 
+       plot = absolute_end_hatching, 
+       device = "png", 
        units = "mm",
        width = 125, 
        height = 125)  
 
-
-
-
-abs_end_plot_april1 <- ggplot(data = data_trimmed, 
+##
+## plot for date from April 1
+absolute_end_date <- ggplot(data = data, 
                             aes(x = inc_start_aprildays, 
-                                y = last_onbout.1,
+                                y = activity_end_abs,
                                 fill = area,
                                 color = area)) +
-  geom_line(data = data_trimmed,
+  geom_line(data = data,
             aes(y = (1+sunset_inc_start_dec)*60, color = "black"),
             size = 1,
             alpha = 0.75,
@@ -510,9 +443,9 @@ abs_end_plot_april1 <- ggplot(data = data_trimmed,
                      values = c("black", "#7fbf7b", "#af8dc3"))
 
 
-ggsave(filename = "./plots/1b_End of activity/ABS_end_pred_april1.jpeg", 
-       plot = abs_end_plot_april1, 
-       device = "jpeg", 
+ggsave(filename = "./plots/Figure S1ab.png", 
+       plot = absolute_end_date, 
+       device = "png", 
        units = "mm",
        width = 135, 
        height = 100)  

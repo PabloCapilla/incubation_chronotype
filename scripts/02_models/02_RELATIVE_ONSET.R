@@ -204,14 +204,14 @@ top_relative_onset <- lmer(activity_onset_relative ~
                         data=data)
 summary(top_relative_onset)
 
-# maternal repeatability of absolute onset of activity
+# maternal repeatability of relative onset of activity
 as.numeric(summary(top_relative_onset)$varcor[1]) / 
   ((as.numeric(summary(top_relative_onset)$varcor[1]) + 
       (as.numeric(summary(top_relative_onset)$varcor[2])) +
       (as.numeric(summary(top_relative_onset)$varcor[3])) +
       summary(top_relative_onset)$sigma^2))
 
-# maternal repeatability with 95%CI of absolute onset of activity
+# maternal repeatability with 95%CI of relative onset of activity
 rep_relative_onset <- rpt(activity_onset_relative ~ 
                             area:inc_start_aprildays + 
                             area:day_before_hatch +

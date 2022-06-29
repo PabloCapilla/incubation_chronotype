@@ -86,7 +86,8 @@ for(i in 1:nrow(data)){
   data$dusk_inc_start[i] <- ymd_hms(suntimes$dusk)
 }
 data$sunrise_inc_start_dec <- hour(ymd_hms(data$sunrise_inc_start)) + (minute(ymd_hms(data$sunrise_inc_start))/60)
-
+data$sunset_inc_start_dec <- hour(ymd_hms(data$sunset_inc_start)) + (minute(ymd_hms(data$sunset_inc_start))/60)
+  
 
 ##
 ##
