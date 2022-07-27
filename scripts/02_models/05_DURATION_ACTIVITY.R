@@ -1,39 +1,52 @@
+###
+###
+#' 
+#' Script for:
+#' Reproductive fitness is associated with female chronotype in a songbird
+#' Womack, et al. 
+#' Preprint: 10.1101/2022.07.01.498449v1
+#' 
+#' Latest update: 2022-07-27
+#' 
+###
+###
+
+# Clear memory to make sure there are not files loaded that could cause problems
+rm(list=ls())
+
+##
+##
+##### Script aim: #####
+#' Analysis of duration of activity
+#' 
+##
+##
+
+##
 ##
 ##### libraries #####
 ##
-pacman::p_load(lubridate, lme4, MuMIn, dplyr, ggplot2, ggridges, extrafont)
+##
+pacman::p_load(openxlsx, 
+               lubridate, dplyr, tidyr, rptR,
+               lme4, performance,
+               ggplot2, extrafont)
 loadfonts()
 
-
-##
-##### functions #####
-##
-substrRight <- function(x, n){
-  substr(x, nchar(x)-n+1, nchar(x))
-}
-
-
-
 ##
 ##
-##### Data sets #####
+##### data #####
 ##
 ##
-data <- read.csv("./data/Full_incubation_reproduction_data_ROBYN_&_CIARA.csv")
-data$box <- substr(as.character(data$box),1,nchar(as.character(data$box))-5) # correct format for box ID
-data$last_onbout <- ifelse(data$last_onbout == "", NA, data$last_onbout)
-data$activity_end <- hm(format(dmy_hm(data$last_onbout), format = "%H:%M"))
-data <- left_join(x = data, 
-                  y = data %>% 
-                    group_by(year, box) %>% 
-                    summarise(mean_days_april = mean(date_aprildays, na.rm = T)), 
-                  by = c("year", "box")) %>% 
-  filter(day_before_hatch < 0) # very little data on the day of hatching
+data00 <- readRDS("./data/data_incubation.RDS")
+head(data00)
 
-head(data)
 
-## the observations below were removed from Robyn's and Ciara's analyses. I assume there are 
-## reasons for that, so I remove them too
+##
+## filtering data for end of activity
+##
+
+## days were females were disturbed before end of activity. Therefore, observations removed from dataset
 box_remove <- c("27KG", "245SAL","32KG","12CASH","425CASH","425CASH","244SAL", "128PEN", "29KG","151FS")
 recording_date_remove <- c("2018-05-14","2018-05-23","2018-05-21",
                            "2018-05-16","2018-05-16","2018-05-23",
@@ -43,61 +56,21 @@ remove_df<- data.frame(box = box_remove, recording_date = recording_date_remove)
 remove_df$box <- as.character(remove_df$box)
 remove_df$recording_date <- as.character(remove_df$recording)
 
+data00$recording_date <- as.character(data00$recording_date)
+data <- anti_join(data00, remove_df, by=c("box","recording_date"))
+data<- data[!is.na(data$activity_end_relative),]
+data<- data %>% filter(activity_end_relative > -300)
 
-##
-## IMPORTANT, REPORT THESE REMOVALS OF DATA AND WHY
-# Ciara's code for Robyn's data set
-data$recording_date <- as.character(data$recording_date)
-data_trimmed <- anti_join(data, remove_df, by=c("box","recording_date"))
-data_trimmed<- data_trimmed[!is.na(data_trimmed$diff_sunset),]
-data_trimmed<- data_trimmed %>% filter(diff_sunset > -300)
-
-
-
-data_trimmed$duration_act <- as.numeric(as.difftime(data_trimmed$activity_end - hms(data_trimmed$activity_onset)),
-                                        units = "hours")
-
-# checking new and old calculations of duration
-plot(data_trimmed$duration_act, data_trimmed$act_window)
-
-
-
-# sample size
-data_trimmed %>% 
-  group_by(year, area) %>% 
-  summarise(n_obs = n())
-
-data_trimmed %>% 
-  group_by(box, year, area) %>% 
-  filter(row_number() == 1) %>% 
-  group_by(year, area) %>% 
-  summarise(n_obs = n())
-
+## duration of activity in min
+data$duration_act <- as.numeric(data$activity_end_abs - data$activity_onset_abs)
 
 ##
 ##
-##### Preliminary plots ####
-##
-##
-ggplot(data = data_trimmed, aes(x = inc_start_aprildays, y = duration_act, color = area)) +
-  facet_wrap(~area) +
-  geom_point() +
-  stat_smooth(method = "lm")
-
-ggplot(data = data_trimmed, aes(x = day_before_hatch, y = duration_act, color = area)) +
-  facet_wrap(~area) +
-  geom_point() +
-  stat_smooth(method = "lm")
-
-
-
-##
-##
-##### Models #####
+##### Models for duration of activity #####
 ##
 ##
 
-# Robyn's model
+# model fit
 day_length_model <- lmer(duration_act ~ 
                            area:poly(inc_start_aprildays,2)[,2] + 
                            area:poly(inc_start_aprildays,2)[,1] +  
@@ -117,14 +90,21 @@ day_length_model <- lmer(duration_act ~
                            (1|year),
                          na.action = "na.fail",
                          REML = F,                 
-                         data=data_trimmed) 
-
+                         data=data) 
 summary(day_length_model)
 
 # model diagnostics
-plot(day_length_model)
-hist(residuals(day_length_model))
+check_model(day_length_model, panel = F) # not too bad overall
 
+# significance of random effects 
+lmerTest::rand(day_length_model)
+
+# maternal repeatability of relative onset of activity
+as.numeric(summary(day_length_model)$varcor[1]) / 
+  (as.numeric(summary(day_length_model)$varcor[1]) + 
+     as.numeric(summary(day_length_model)$varcor[2]) +
+     as.numeric(summary(day_length_model)$varcor[3]) +
+     summary(day_length_model)$sigma^2)
 
 ##
 ##
@@ -157,17 +137,19 @@ m6 <- update(m5, . ~ . - poly(day_before_hatch, 2)[, 2])
 #6
 drop1(m6, test = "Chisq")
 
-#mam
+# Final model
 m_mam <- m6
-drop1(m_mam, test = "Chisq")
 summary(m_mam)
 
-CI_onset <- confint(m_mam, 
-                    level = 0.95, 
-                    method = "boot", 
-                    nsim = 500, 
-                    boot.type = "norm")
 
+##
+##
+##### Likelihood-ratio test results #####
+##
+##
+
+# for effects in final model
+drop1(m_mam, test = "Chisq")
 
 # p for non significant terms
 m_clutch_size <- update(m_mam, . ~ . + clutch_size)
@@ -191,32 +173,42 @@ m_days_int2 <- update(m_mam, . ~ . + poly(inc_start_aprildays, 2)[, 2])
 anova(m_days_int1, m_days_int2, test = "Chisq")
 
 
-
-
 ##
 ##
-##### Plot model predictions #####
+##### Final model results #####
 ##
 ##
 
 # final model
-day_length_final <- lmer(duration_act ~ 
-                             area:inc_start_aprildays +  
-                             area:day_before_hatch +  
-                             inc_start_aprildays +
-                             day_before_hatch +
-                             area + 
+day_length_final <- lmer(duration_act/60 ~ 
+                           area:inc_start_aprildays +  
+                           area:day_before_hatch +  
+                           inc_start_aprildays +
+                           day_before_hatch +
+                           area + 
                            (1|site) +
                            (1|box) +
                            (1|year),
-                       REML = T,                 
-                       data=data_trimmed)
-r.squaredGLMM(day_length_final)
+                         REML = T,                 
+                         data=data)
 summary(day_length_final)
 
-##
-## repeatability
-rep_duration <- rpt(duration_act ~ 
+# 95%CIs
+CI_onset <- confint(day_length_final, 
+                    level = 0.95, 
+                    method = "boot", 
+                    nsim = 500, 
+                    boot.type = "norm")
+
+# maternal repeatability of absolute end of activity
+as.numeric(summary(day_length_final)$varcor[1]) / 
+  ((as.numeric(summary(day_length_final)$varcor[1]) + 
+      (as.numeric(summary(day_length_final)$varcor[2])) +
+      (as.numeric(summary(day_length_final)$varcor[3])) +
+      summary(day_length_final)$sigma^2))
+
+# maternal repeatability with 95%CI of duration of active day
+rep_duration <- rpt(duration_act/60 ~ 
                              area:inc_start_aprildays +  
                              area:day_before_hatch +  
                              inc_start_aprildays +
@@ -226,28 +218,24 @@ rep_duration <- rpt(duration_act ~
                              (1|box) +
                              (1|year), 
                            grname = "box", 
-                           data = data_trimmed, 
+                           data = data, 
                            datatype = "Gaussian", 
                            nboot = 1000, 
-                           npermut = 5)
+                           npermut = 0)
+##
+##
+##### Plot model predictions #####
+##
+##
 
-
-CI_onset <- confint(day_length_final, 
-                    level = 0.95, 
-                    method = "boot", 
-                    nsim = 500, 
-                    boot.type = "norm")
-
-
-
-df_pred <- expand.grid(day_before_hatch = seq(min(data_trimmed$day_before_hatch), 
-                                              max(data_trimmed$day_before_hatch), 1),
+# new dataframe to predict
+df_pred <- expand.grid(day_before_hatch = seq(min(data$day_before_hatch), 
+                                              max(data$day_before_hatch), 1),
                        area = c("City", "Forest"),
-                       inc_start_aprildays = seq(min(data_trimmed$inc_start_aprildays), 
-                                                 max(data_trimmed$inc_start_aprildays), 1))
+                       inc_start_aprildays = seq(min(data$inc_start_aprildays), 
+                                                 max(data$inc_start_aprildays), 1))
 df_pred$prediction <- predict(day_length_final, df_pred, re.form = NA)
 
-# need to adapt code to new R version
 # SE for mean predictions
 mm <- model.matrix(~ area:inc_start_aprildays +  
                      area:day_before_hatch +  
@@ -279,8 +267,9 @@ remove_forest <- which((df_pred$inc_start_aprildays < 28 |
 df_pred <- df_pred[-c(remove_city, remove_forest),]
 
 
-
-duration_hatch_plot <- ggplot(data = data_trimmed, 
+## 
+## plot days to hatching - duration
+duration_hatch_plot <- ggplot(data = data, 
                               aes(x = day_before_hatch, 
                                   y = duration_act,
                                   fill = area,
@@ -327,22 +316,23 @@ duration_hatch_plot <- ggplot(data = data_trimmed,
   scale_color_manual(name = "", labels = c("City", "Forest"), 
                      values = c("#af8dc3", "#7fbf7b"))
 
-
-ggsave(filename = "./plots/duration_hatch.jpeg",
-       plot = duration_hatch_plot, 
-       device = "jpeg", 
-       units = "mm",
-       width = 125, 
-       height = 125)  
+##
+## plots not included in manuscript
+#ggsave(filename = "./plots/duration_hatch.jpeg",
+#       plot = duration_hatch_plot, 
+#       device = "jpeg", 
+#       units = "mm",
+#       width = 125, 
+#       height = 125)  
 
 
 ##
-## plot for days from April 1
-duration_abs_date <- ggplot(data = data_trimmed, 
-                              aes(x = inc_start_aprildays, 
-                                  y = duration_act,
-                                  fill = area,
-                                  color = area)) +
+## plot for days from April 1 - Figure S2
+duration_abs_date <- ggplot(data = data, 
+                            aes(x = inc_start_aprildays, 
+                                y = duration_act,
+                                fill = area,
+                                color = area)) +
   geom_point(alpha = 0.25,
              size = 1.25,
              shape = 21, 
@@ -381,7 +371,7 @@ duration_abs_date <- ggplot(data = data_trimmed,
                      values = c("#af8dc3", "#7fbf7b")) 
 
 
-ggsave(filename = "./plots/Duration/duration_april1.jpeg", 
+ggsave(filename = "./plots/Figure S2.jpeg", 
        plot = duration_abs_date, 
        device = "jpeg", 
        units = "mm",

@@ -7,6 +7,7 @@ This repository contains materials used for a project investigating incubation i
 ---
 
 Robyn J. Womack<sup>#</sup>, Pablo Capilla-Lasheras<sup>#</sup>, Ciara L. O. McGlade,  Davide M. Dominoni, Barbara Helm. **Reproductive fitness is associated with female chronotype in a songbird**. *bioRxiv*. DOI: 10.1101/2022.07.01.498449v1
+
 <sup>#</sup> joint first authors
 
 ---
@@ -19,7 +20,7 @@ All R code is available in [`scripts`](https://github.com/PabloCapilla/incubatio
 
 ## Folders:
 
-* [`data`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data): contains two files, one for [`raw data`] (https://github.com/PabloCapilla/incubation_chronotype/tree/main/data/01_raw_data) and one with a dataset ready to be analysed ([`data_incubation.RDS`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data)).
+* [`data`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data): contains two files, one for [`raw data`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data/01_raw_data) and one with a dataset ready to be analysed ([`data_incubation.RDS`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data)).
 
 * [`scripts`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/scripts): R code to produce results and figures included in the manuscript. It contains three subfolders:
 + [`01_data_prep`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/scripts/01_data_prep): script to clean and generate a table for further analysis (saved as [`data_incubation.RDS`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data) in [`data`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data)).

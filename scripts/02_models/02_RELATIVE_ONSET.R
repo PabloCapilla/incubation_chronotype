@@ -4,9 +4,9 @@
 #' Script for:
 #' Reproductive fitness is associated with female chronotype in a songbird
 #' Womack, et al. 
-#' Preprint: 
+#' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2022-06-08
+#' Latest update: 2022-07-27
 #' 
 ###
 ###
@@ -29,7 +29,7 @@ rm(list=ls())
 ##
 pacman::p_load(openxlsx, 
                lubridate, dplyr, tidyr,
-               lme4, performance,
+               lme4, performance, rptR,
                ggplot2, extrafont)
 loadfonts()
 
