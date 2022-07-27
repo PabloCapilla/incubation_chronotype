@@ -444,22 +444,3 @@ ggsave(filename = "./plots/Figure S1cd.png",
        width = 135, 
        height = 100)  
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

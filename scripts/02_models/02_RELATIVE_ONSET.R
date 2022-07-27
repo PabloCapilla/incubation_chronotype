@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 
 #' 
-#' Latest update: 2022-06-8
+#' Latest update: 2022-06-08
 #' 
 ###
 ###
