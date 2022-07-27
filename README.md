@@ -23,10 +23,10 @@ All R code is available in [`scripts`](https://github.com/PabloCapilla/incubatio
 * [`data`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data): contains two files, one for [`raw data`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data/01_raw_data) and one with a dataset ready to be analysed ([`data_incubation.RDS`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data)).
 
 * [`scripts`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/scripts): R code to produce results and figures included in the manuscript. It contains three subfolders:
-+ [`01_data_prep`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/scripts/01_data_prep): script to clean and generate a table for further analysis (saved as [`data_incubation.RDS`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data) in [`data`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data)).
-+ [`02_models`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/scripts/02_models): scripts for statistical models and visualisation of results.
+  + [`01_data_prep`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/scripts/01_data_prep): script to clean and generate a table for further analysis (saved as [`data_incubation.RDS`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data) in [`data`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/data)).
+  + [`02_models`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/scripts/02_models): scripts for statistical models and visualisation of results.
 
-*[`plots`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/plots): contains all figures (main and supplementary ones) created for this study, all of which were created using the R package [ggplot2 v.3.3.6](https://cran.r-project.org/web/packages/ggplot2/index.html).
+* [`plots`](https://github.com/PabloCapilla/incubation_chronotype/tree/main/plots): contains all figures (main and supplementary ones) created for this study, all of which were created using the R package [ggplot2 v.3.3.6](https://cran.r-project.org/web/packages/ggplot2/index.html).
 
 ## Notes
 
