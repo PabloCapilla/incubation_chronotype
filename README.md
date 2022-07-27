@@ -6,8 +6,8 @@ This repository contains materials used for a project investigating incubation i
 
 ---
 
-Robyn J. Womack^#^, Pablo Capilla-Lasheras^#^, Ciara L. O. McGlade,  Davide M. Dominoni, Barbara Helm. **Reproductive fitness is associated with female chronotype in a songbird**. *bioRxiv*. DOI: 10.1101/2022.07.01.498449v1
-^#^ joint first authors
+Robyn J. Womack<sup>#</sup>, Pablo Capilla-Lasheras<sup>#</sup>, Ciara L. O. McGlade,  Davide M. Dominoni, Barbara Helm. **Reproductive fitness is associated with female chronotype in a songbird**. *bioRxiv*. DOI: 10.1101/2022.07.01.498449v1
+<sup>#</sup> joint first authors
 
 ---
 
