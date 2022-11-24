@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2022-07-27
+#' Latest update: 2022-10-25
 #' 
 ###
 ###
@@ -83,11 +83,27 @@ full_fledge_model <- glmer(fledglings ~
                            na.action = "na.fail",
                            data=data)
 summary(full_fledge_model)
-
 # model diagnostics
 residuals <- DHARMa::simulateResiduals(full_fledge_model, n = 1000, refit = F)
 DHARMa::testDispersion(residuals)
 
+##
+## full model without interactions (i.e., not doing model selection on single terms)
+full_fledge_model_b <- glmer(fledglings ~
+
+                             poly(hatching_date_jul,2)[,1] +
+                             poly(hatching_date_jul,2)[,2] +
+                             scale(chronotype)+
+                             area+
+                             scale(clutch_size)+
+                             (1|site) +
+                             (1|year) +
+                             (1|box), 
+                           family = "poisson",
+                           na.action = "na.fail",
+                           data=data)
+summary(full_fledge_model_b)
+drop1(full_fledge_model_b, test = "Chisq")
 
 ##
 ##

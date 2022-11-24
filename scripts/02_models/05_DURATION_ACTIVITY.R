@@ -371,7 +371,7 @@ duration_abs_date <- ggplot(data = data,
                      values = c("#af8dc3", "#7fbf7b")) 
 
 
-ggsave(filename = "./plots/Figure S2.jpeg", 
+ggsave(filename = "./plots/Figure S3.jpeg", 
        plot = duration_abs_date, 
        device = "jpeg", 
        units = "mm",

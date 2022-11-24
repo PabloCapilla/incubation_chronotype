@@ -59,6 +59,15 @@ data %>%
   summarise(n_obs = n()) %>% 
   nrow()
 
+# breeding attempts per nestbox
+ba_per_box <- data %>% 
+  group_by(year, box) %>% 
+  filter(row_number() == 1) %>% 
+  group_by(box) %>% 
+  summarise(count_ba = n())
+table(ba_per_box$count_ba)
+
+
 # days of incubation per clutch
 data %>% 
   group_by(box,year) %>% 
@@ -83,6 +92,8 @@ data %>%
   summarise(mean_date = mean(mean_box),
             n_size = n(),
             sd_date = sd(mean_box/sqrt(n())))
+
+# 
 
 ##
 ##### models for relative onset of activity #####

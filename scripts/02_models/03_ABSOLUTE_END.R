@@ -374,7 +374,7 @@ absolute_end_hatching <- ggplot(data = data,
              color = "black",
              position = position_dodge(width = 0.5)) +
   labs(x = "Days before hatching", 
-       y = "Absolute end of activity (minutes after sunset)") +
+       y = "Clock time end of activity") +
   scale_x_continuous(breaks = -15:-1, labels = 15:1) +
   scale_y_continuous(breaks = seq(1050,1320, 30),
                      labels = labels_time) +
@@ -434,7 +434,7 @@ absolute_end_date <- ggplot(data = data,
             aes(y = mean_pred, color = area), 
             size = 1.5) +
   labs(x = "Incubation start date (days after April 1)", 
-       y = "Absolute end of activity") +
+       y = "Clock time end of activity") +
   scale_y_continuous(breaks = seq(1050,1320, 30),
                      labels = labels_time) +
   scale_fill_manual(name = "", labels = c("Urban", "Forest"), 
@@ -443,7 +443,7 @@ absolute_end_date <- ggplot(data = data,
                      values = c("black", "#7fbf7b", "#af8dc3"))
 
 
-ggsave(filename = "./plots/Figure S1ab.png", 
+ggsave(filename = "./plots/Figure S2ab.png", 
        plot = absolute_end_date, 
        device = "png", 
        units = "mm",

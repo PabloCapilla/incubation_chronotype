@@ -337,7 +337,7 @@ absolute_onset_hatching <- ggplot(data = data,
              color = "black",
              position = position_dodge(width = 0.5)) +
   labs(x = "Days before hatching", 
-       y = "Absolute onset of activity") +
+       y = "Clock time onset of activity") +
   scale_x_continuous(breaks = -15:-1, labels = 15:1) +
   scale_y_continuous(breaks = seq(240,420, 30),
                      labels = labels_time) +
