@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2022-10-25
+#' Latest update: 2023-02-28
 #' 
 ###
 ###
@@ -32,6 +32,9 @@ pacman::p_load(openxlsx,
                lme4, performance,
                ggplot2, extrafont)
 loadfonts()
+source("./scripts/FUNCTION_drop1_output.R")
+
+#####
 
 ##
 ##
@@ -59,7 +62,7 @@ data <- data00 %>%
   mutate(failed_n = hatchlings - fledglings) %>% 
   left_join(., y = chrono_box, by = c("year", "box"))
 
-
+#####
 
 ##
 ##
@@ -75,131 +78,160 @@ full_fledge_model <- glmer(fledglings ~
                              poly(hatching_date_jul,2)[,2] +
                              scale(chronotype)+
                              area+
-                             scale(clutch_size)+
-                             (1|site) +
+                             clutch_size+
                              (1|year) +
+                             (1|site) +
                              (1|box), 
                            family = "poisson",
+                           control = glmerControl(optimizer = "bobyqa"),
                            na.action = "na.fail",
                            data=data)
 summary(full_fledge_model)
+
 # model diagnostics
 residuals <- DHARMa::simulateResiduals(full_fledge_model, n = 1000, refit = F)
 DHARMa::testDispersion(residuals)
 
-##
-## full model without interactions (i.e., not doing model selection on single terms)
-full_fledge_model_b <- glmer(fledglings ~
-
-                             poly(hatching_date_jul,2)[,1] +
-                             poly(hatching_date_jul,2)[,2] +
-                             scale(chronotype)+
-                             area+
-                             scale(clutch_size)+
-                             (1|site) +
-                             (1|year) +
-                             (1|box), 
-                           family = "poisson",
-                           na.action = "na.fail",
-                           data=data)
-summary(full_fledge_model_b)
-drop1(full_fledge_model_b, test = "Chisq")
+#####
 
 ##
 ##
-##### Model selection LRT #####
+##### Are interactions significant? #####
 ##
 ##
+
+## 1
 drop1(full_fledge_model, test = "Chisq")
-m1 <- update(full_fledge_model, . ~ . - area:poly(hatching_date_jul, 2)[, 2])
 
-#1
-drop1(m1, test = "Chisq")
-m2 <- update(m1, . ~ . - poly(hatching_date_jul, 2)[, 1]:area)
+## interaction 'area:poly(inc_start_aprildays,2)[,2]'
+anova(full_fledge_model, 
+      update(full_fledge_model, 
+             . ~ . - poly(hatching_date_jul,2)[,2] : area),
+      test = "LRT")
 
-#2
-drop1(m2, test = "Chisq")
-m3 <- update(m2, . ~ . - scale(chronotype):area)
+## interaction 'area:poly(day_before_hatch, 2)[, 2]'
+anova(full_fledge_model, 
+      update(full_fledge_model, 
+             . ~ . - poly(hatching_date_jul,2)[,1] : area),
+      test = "LRT")
 
-#3
-drop1(m3, test = "Chisq")
-m4 <- update(m3, . ~ . - poly(hatching_date_jul, 2)[, 2])
+## interaction 'scale(chronotype):area'
+anova(full_fledge_model, 
+      update(full_fledge_model, 
+             . ~ . - scale(chronotype):area),
+      test = "LRT")
 
-#4
-drop1(m4, test = "Chisq")
-m5 <- update(m4, . ~ . - poly(hatching_date_jul, 2)[, 1])
 
-#5
-drop1(m5, test = "Chisq")
+## removing both interactions 
+full_model <- update(full_fledge_model, 
+                     . ~ . 
+                     - scale(chronotype):area 
+                     - poly(hatching_date_jul,2)[,2] : area
+                     - poly(hatching_date_jul,2)[,1] : area)
 
-# Final model
-m_mam <- m5
-summary(m_mam)
+## comparison model without any interaction against initial
+anova(full_fledge_model, 
+      full_model,
+      test = "LRT")
 
-##
-##
-##### Likelihood-ratio test results #####
-##
-##
-
-# for effects in final model
-drop1(m_mam, test = "Chisq")
-
-# p for non significant terms
-m_int2 <- update(m_mam, . ~ . + 
-                   poly(hatching_date_jul, 2)[, 1]+
-                   poly(hatching_date_jul, 2)[, 2]+
-                   area:poly(hatching_date_jul, 2)[, 2])
-anova(m_int2, update(m_mam, .~.+
-                       poly(hatching_date_jul, 2)[, 1]+
-                       poly(hatching_date_jul, 2)[, 2]), test = "Chisq")
-
-m_int1 <- update(m_mam, . ~ . + 
-                   poly(hatching_date_jul, 2)[, 1]+
-                   area:poly(hatching_date_jul, 2)[, 1])
-anova(m_int1, update(m_mam, .~.+
-                       poly(hatching_date_jul, 2)[, 1]), test = "Chisq")
-
-m_chr_int <- update(m_mam, . ~ . + scale(chronotype) : area)
-anova(m_chr_int, m_mam, test = "Chisq")
-
-m_date2 <- update(m_mam, . ~ . + 
-                    poly(hatching_date_jul, 2)[, 1]+
-                    poly(hatching_date_jul, 2)[, 2])
-anova(m_date2, update(m_mam, .~.+
-                        poly(hatching_date_jul, 2)[, 1]), test = "Chisq")
-
-m_date1 <- update(m_mam, . ~ . + 
-                    poly(hatching_date_jul, 2)[, 1])
-anova(m_date1, m_mam, test = "Chisq")
+#####
 
 ##
 ##
 ##### Final model results #####
 ##
 ##
+summary(full_model)
+lmerTest::rand(full_model)
 
-# final model
-top_fledge_model <- glmer(fledglings ~
-                               chronotype+
-                               area+
-                               clutch_size +
-                               (1|site) +
-                               (1|box) +
-                               (1|year),
-                             na.action = "na.fail",
-                             family = "poisson",
-                             glmerControl(optimizer = "bobyqa"),
-                             data=data)
-summary(top_fledge_model)
+drop1(full_model, test = "Chisq")
+summary(full_model)
 
-# 95%CIs
-CI_onset <- confint(top_fledge_model, 
-                    level = 0.95, 
-                    method = "boot", 
-                    nsim = 500, 
-                    boot.type = "norm")
+##
+## effect of absolute chronotype
+drop1(update(full_model, .~.
+             +scale(chronotype_abs)
+             -scale(chronotype)), 
+             test = "Chisq")
 
+drop1(update(full_model, .~.
+             +scale(chronotype_abs):area
+             +scale(chronotype_abs)
+             -scale(chronotype)), 
+      test = "Chisq")
+
+##
+## final model with year as a fixed effect
+full_fledge_model_year <- glmer(fledglings ~
+
+                             poly(hatching_date_jul,2)[,1] +
+                             poly(hatching_date_jul,2)[,2] +
+                             scale(chronotype)+
+                             area+
+                             clutch_size+
+                             as.factor(year) +
+                             (1|site) +
+                             (1|box), 
+                           family = "poisson",
+                           control = glmerControl(optimizer = "bobyqa"),
+                           na.action = "na.fail",
+                           data=data)
+summary(full_fledge_model_year)
+drop1(full_fledge_model_year, test = "Chisq")
+
+
+#####
+
+##
+##
+##### Table of results 3 #####
+##
+##
+
+## base table
+table_fledglings00 <- full_model %>%
+  tbl_regression(intercept = T,
+                 label = list(
+                   `(Intercept)` = "Intercept",
+                   `poly(hatching_date_jul, 2)[, 1]` = "Hatching date1",
+                   `poly(hatching_date_jul, 2)[, 2]` = "Hatching date2",
+                   `clutch_size` = "Clutch size",
+                   `scale(chronotype)` = "Female chronotype",
+                   `area` = "Habitat"),
+                 estimate_fun = ~ style_number(.x, digits = 2))
+
+## add features
+table_fledglings <- table_fledglings00 %>% 
+  add_global_p(anova_fun = drop1_output) %>% 
+  bold_p(t = 0.05) %>% 
+  bold_labels() %>%
+  italicize_levels() %>% 
+  modify_table_body(fun = function(.){
+    output <- left_join(x = .,
+                        y = drop1_output(x=full_model) %>% 
+                          dplyr::select(variable = term, Chisq=statistic, df),
+                        by = "variable")
+    output$df <- ifelse(output$row_type == "label",  output$df, NA)
+    output$Chisq <- ifelse(output$row_type == "label",  output$Chisq, NA)
+    return(output)
+  }) %>% 
+  modify_fmt_fun(c(Chisq) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(std.error) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(p.value) ~ function(x) style_number(x, digits = 3)) %>%
+  modify_table_body(~.x %>% dplyr::relocate(p.value, .after = df)) %>% 
+  modify_header(label ~ "**Fixed effect**") %>% 
+  modify_header(std.error ~ "**SE**") %>%
+  modify_header(estimate ~ "**Estimate**") %>%
+  modify_header(df ~ "**df**") %>% 
+  modify_header(Chisq ~ html("<b>&chi;<sup>2</sup></b>")) %>% 
+  as_gt() %>% 
+  opt_footnote_marks(marks = "LETTERS")
+
+##
+## save table
+gtsave(table_fledglings, "./tables/TABLE 3.html")
+
+#####
 
 ##
 ##
@@ -207,14 +239,34 @@ CI_onset <- confint(top_fledge_model,
 ##
 ##
 
-# new dataframe to predict
+##
+## model specification for predictions
+full_model_predictions <- glmer(fledglings ~
+                                  
+                                  I(hatching_date_jul^2) +
+                                  hatching_date_jul +
+                                  chronotype+
+                                  area+
+                                  clutch_size+
+                                  (1|year) +
+                                  (1|site) +
+                                  (1|box), 
+                                family = "poisson",
+                                control = glmerControl(optimizer = "bobyqa"),
+                                na.action = "na.fail",
+                                data=data)
+
+# new data frame to predict
 df_pred <- expand.grid(chronotype = seq(min(data$chronotype), 
                                         max(data$chronotype), 0.5),
                        area = c("City", "Forest"))
 df_pred$clutch_size <- ifelse(df_pred$area == "City", 
                               mean(data$clutch_size[data$area == "City"]),
                               mean(data$clutch_size[data$area == "Forest"]))
-df_pred$prediction_link <- predict(top_fledge_model,
+df_pred$hatching_date_jul <- ifelse(df_pred$area == "City", 
+                              mean(data$hatching_date_jul[data$area == "City"]),
+                              mean(data$hatching_date_jul[data$area == "Forest"]))
+df_pred$prediction_link <- predict(full_model_predictions,
                                    df_pred, 
                                    type = "link",
                                    re.form = NA)
@@ -236,13 +288,16 @@ df_pred <- df_pred[-c(remove_city, remove_forest),]
 
 # need to adapt code to new R version
 # SE for mean predicitons
-mm <- model.matrix(~ chronotype+
+mm <- model.matrix(~ 
+                     I(hatching_date_jul^2) +
+                     hatching_date_jul +
+                     chronotype+
                      area+
                      clutch_size,
                    data = df_pred)
 
 ## or newdat$distance <- mm %*% fixef(fm1)
-pvar1 <- diag(mm %*% tcrossprod(vcov(top_fledge_model),mm))
+pvar1 <- diag(mm %*% tcrossprod(vcov(full_model_predictions),mm))
 cmult <- 1 ## 1 SE
 df_pred <- data.frame(
   df_pred
@@ -289,10 +344,10 @@ fledglings_plot <- ggplot(data = data, aes(x = chronotype,
     y = "Number of fledglings") +
   scale_shape_manual(name = "",
                      values = c(21,24),
-                     labels = c("City", "Forest")) +  
-  scale_fill_manual(name = "", labels = c("City", "Forest"), 
+                     labels = c("Urban", "Forest")) +  
+  scale_fill_manual(name = "", labels = c("Urban", "Forest"), 
                     values = c("#af8dc3", "#7fbf7b")) +
-  scale_color_manual(name = "", labels = c("City", "Forest"), 
+  scale_color_manual(name = "", labels = c("Urban", "Forest"), 
                      values = c("#af8dc3", "#7fbf7b")) +
   scale_y_continuous(breaks = seq(0,10,2), labels = seq(0,10,2))
 
@@ -304,7 +359,19 @@ ggsave(filename = "./plots/Figure 2a.jpeg",
        width = 90, 
        height = 90)  
 
+##
+## simplified x lab
+fledglings_plot_no_lab <- fledglings_plot +
+  labs(x = "Female chronotype", 
+       y = "Number of fledglings") 
 
+ggsave(filename = "./plots/Figure 2a - simplified label.jpeg", 
+       plot = fledglings_plot_no_lab, 
+       device = "jpeg", 
+       units = "mm",
+       width = 90, 
+       height = 90)  
+#####
 
 ##
 ##
@@ -319,15 +386,12 @@ rm(list = c("m1","m2","m3","m4","m5","mam"))
 
 data$total_failure <- ifelse(data$fledglings == 0, 1, 0) # binomial variable for full failure
 full_failure <- glmer(total_failure ~
-                        poly(hatching_date_jul,2)[,1] : area +
-                        poly(hatching_date_jul,2)[,2] : area +
-                        scale(chronotype):area+
-                        
+
                         poly(hatching_date_jul,2)[,1] +
                         poly(hatching_date_jul,2)[,2] +
                         scale(chronotype)+
                         area+
-                        scale(clutch_size)+
+                        clutch_size+
                         (1|site) +
                         (1|year) +
                         (1|box), 
@@ -335,91 +399,60 @@ full_failure <- glmer(total_failure ~
                       na.action = "na.fail",
                       data=data)
 summary(full_failure)
-
-##
-##
-##### Model selection LRT #####
-##
-##
 drop1(full_failure, test = "Chisq")
-ffm1 <- update(full_failure, . ~ . - scale(clutch_size))
 
-#1
-drop1(ffm1, test = "Chisq")
-ffm2 <- update(ffm1, . ~ . - poly(hatching_date_jul, 2)[, 2]:area)
-
-#2
-drop1(ffm2, test = "Chisq")
-ffm3 <- update(ffm2, . ~ . - poly(hatching_date_jul, 2)[, 2])
-
-#3
-drop1(ffm3, test = "Chisq")
-ffm4 <- update(ffm3, . ~ . - scale(chronotype):area)
-
-#4
-drop1(ffm4, test = "Chisq")
-ffm5 <- update(ffm4, . ~ . - poly(hatching_date_jul, 2)[, 1]:area)
-
-#5
-drop1(ffm5, test = "Chi")
-ffm6 <- update(ffm5, . ~ . - poly(hatching_date_jul, 2)[, 1])
-
-#5
-drop1(ffm6, test = "Chisq")
-ffm7 <- update(ffm6, . ~ . - scale(chronotype))
-
-#6
-drop1(ffm7, test = "Chisq")
-ffm8 <- update(ffm7, . ~ . - area)
-
-
-# mam
-m_mam <- ffm8
-drop1(m_mam, test = "Chisq")
-summary(m_mam)
-
+#####
 
 ##
 ##
-##### Likelihood-ratio test results #####
+##### Table of results S6 #####
 ##
 ##
-m_int2 <- update(m_mam, . ~ . + 
-                   poly(hatching_date_jul, 2)[, 1]+
-                   poly(hatching_date_jul, 2)[, 2]+
-                   area:poly(hatching_date_jul, 2)[, 2]) # tested term
-anova(m_int2, update(m_mam, .~.+
-                       poly(hatching_date_jul, 2)[, 1]+
-                       poly(hatching_date_jul, 2)[, 2]), test = "Chisq")
 
-m_int1 <- update(m_mam, . ~ . + 
-                   poly(hatching_date_jul, 2)[, 1]+
-                   area:poly(hatching_date_jul, 2)[, 1])
-anova(m_int1, update(m_mam, .~.+
-                       poly(hatching_date_jul, 2)[, 1]), test = "Chisq")
+## base table
+table_fledglings_failure00 <- full_failure %>%
+  tbl_regression(intercept = T,
+                 label = list(
+                   `(Intercept)` = "Intercept",
+                   `poly(hatching_date_jul, 2)[, 1]` = "Hatching date1",
+                   `poly(hatching_date_jul, 2)[, 2]` = "Hatching date2",
+                   `clutch_size` = "Clutch size",
+                   `scale(chronotype)` = "Female chronotype",
+                   `area` = "Habitat"),
+                 estimate_fun = ~ style_number(.x, digits = 2))
 
-m_chr_int <- update(m_mam, . ~ . + area + chronotype + chronotype : area)
-anova(m_chr_int, update(m_mam, .~.+
-                          area + chronotype), test = "Chisq")
+## add features
+table_fledglings_failure <- table_fledglings_failure00 %>% 
+  add_global_p(anova_fun = drop1_output) %>% 
+  bold_p(t = 0.05) %>% 
+  bold_labels() %>%
+  italicize_levels() %>% 
+  modify_table_body(fun = function(.){
+    output <- left_join(x = .,
+                        y = drop1_output(x=full_failure) %>% 
+                          dplyr::select(variable = term, Chisq=statistic, df),
+                        by = "variable")
+    output$df <- ifelse(output$row_type == "label",  output$df, NA)
+    output$Chisq <- ifelse(output$row_type == "label",  output$Chisq, NA)
+    return(output)
+  }) %>% 
+  modify_fmt_fun(c(Chisq) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(std.error) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(p.value) ~ function(x) style_number(x, digits = 3)) %>%
+  modify_table_body(~.x %>% dplyr::relocate(p.value, .after = df)) %>% 
+  modify_header(label ~ "**Fixed effect**") %>% 
+  modify_header(std.error ~ "**SE**") %>%
+  modify_header(estimate ~ "**Estimate**") %>%
+  modify_header(df ~ "**df**") %>% 
+  modify_header(Chisq ~ html("<b>&chi;<sup>2</sup></b>")) %>% 
+  as_gt() %>% 
+  opt_footnote_marks(marks = "LETTERS")
 
-m_chr <- update(m_mam, . ~ . + chronotype)
-anova(m_chr, m_mam, test = "Chisq")
+##
+## save table
+gtsave(table_fledglings_failure, "./tables/TABLE S6.html")
 
-m_area <- update(m_mam, . ~ . + area)
-anova(m_area, m_mam, test = "Chisq")
-
-m_clutchsize <- update(m_mam, . ~ . + clutch_size)
-anova(m_clutchsize, m_mam, test = "Chisq")
-
-m_date2 <- update(m_mam, . ~ . + 
-                    poly(hatching_date_jul, 2)[, 1]+
-                    poly(hatching_date_jul, 2)[, 2])
-anova(m_date2, update(m_mam, .~.+
-                        poly(hatching_date_jul, 2)[, 1]), test = "Chisq")
-
-m_date1 <- update(m_mam, . ~ . + 
-                    poly(hatching_date_jul, 2)[, 1])
-anova(m_date1, m_mam, test = "Chisq")
+#####
 
 
 ##
@@ -433,136 +466,170 @@ dataledglings <- data %>%
   filter(fledglings != 0)
 
 ## model
-full_fledglings <- lmer(fledglings ~
-                          poly(hatching_date_jul,2)[,1] : area +
-                          poly(hatching_date_jul,2)[,2] : area +
-                          scale(chronotype):area+
-                          
+full_fledglings_no0 <- lmer(fledglings ~
+
                           poly(hatching_date_jul,2)[,1] +
                           poly(hatching_date_jul,2)[,2] +
                           scale(chronotype)+
                           area+
-                          scale(clutch_size)+
-                          (1|site) +
+                          clutch_size+
                           (1|year) +
+                          (1|site) +
                           (1|box), 
                         REML = F,
                         na.action = "na.fail",
                         data=dataledglings)
-summary(full_fledglings)
-hist(residuals(full_fledglings))
-shapiro.test(residuals(full_fledglings))
-
 
 ##
-## clean previous model objects
-rm(list = c("ffm1","ffm2","ffm3","ffm4","ffm5", "ffm6", "ffm7", "ffm8", "mam"))
+## histogram
+summary(full_fledglings_no0)
+hist(residuals(full_fledglings_no0))
+drop1(full_fledglings_no0, test = "Chisq")
 
 ##
-##
-##### Model selection LRT #####
-##
-##
-drop1(full_fledglings, test = "Chisq")
-m1 <- update(full_fledglings, . ~ . - area:scale(chronotype))
+## checking model convergence
+check_model(full_fledglings_no0, panel = T)
+normality <- check_normality(full_fledglings_no0)
+hist <- plot(normality)
+qqplot <- plot(normality, type = "qq")
 
-#1
-drop1(m1, test = "Chisq")
-m2 <- update(m1, . ~ . - poly(hatching_date_jul, 2)[, 1]:area)
+## saving plots
+ggsave(filename = "./plots/fledging_model_normality.png", 
+       plot = hist, 
+       height = 100, 
+       width = 100,
+       device = "png", 
+       units = "mm")
 
-#2
-drop1(m2, test = "Chisq")
-m3 <- update(m2, . ~ . - poly(hatching_date_jul, 2)[, 2]:area)
+ggsave(filename = "./plots/fledging_model_normality_qq.png", 
+       plot = qqplot, 
+       height = 100, 
+       width = 100,
+       device = "png", 
+       units = "mm")
 
-#3
-drop1(m3, test = "Chisq")
-m4 <- update(m3, . ~ . - poly(hatching_date_jul, 2)[, 2])
 
-#4
-drop1(m4, test = "Chisq")
-m5 <- update(m4, . ~ . - poly(hatching_date_jul, 2)[, 1])
 
-#5
-drop1(m5, test = "Chisq")
-m6 <- update(m5, . ~ . - area)
 
-# 6
-drop1(m6, test = "Chisq")
 
-# Final model
-m_mam <- m6 #m6
-drop1(m_mam, test = "Chisq")
-summary(m_mam)
-
+##### 
 
 ##
 ##
-##### Likelihood-ratio test results #####
+##### Table of results S7 #####
 ##
 ##
 
-# p for non significant terms
-m_int2 <- update(m_mam, . ~ . + 
-                   area +
-                   poly(hatching_date_jul, 2)[, 1]+
-                   poly(hatching_date_jul, 2)[, 2]+
-                   area:poly(hatching_date_jul, 2)[, 2])
-anova(m_int2, update(m_mam, .~.+
-                       area +
-                       poly(hatching_date_jul, 2)[, 1]+
-                       poly(hatching_date_jul, 2)[, 2]), test = "Chisq")
+## base table
+table_fledglings_no000 <- full_fledglings_no0 %>%
+  tbl_regression(intercept = T,
+                 label = list(
+                   `(Intercept)` = "Intercept",
+                   `poly(hatching_date_jul, 2)[, 1]` = "Hatching date1",
+                   `poly(hatching_date_jul, 2)[, 2]` = "Hatching date2",
+                   `clutch_size` = "Clutch size",
+                   `scale(chronotype)` = "Female chronotype",
+                   `area` = "Habitat"),
+                 estimate_fun = ~ style_number(.x, digits = 2))
 
-m_int1 <- update(m_mam, . ~ . + 
-                   area +
-                   poly(hatching_date_jul, 2)[, 1] +
-                   area:poly(hatching_date_jul, 2)[, 1])
-anova(m_int1, update(m_mam, . ~ . + 
-                       area +
-                       poly(hatching_date_jul, 2)[, 1]), test = "Chisq")
+## add features
+table_fledglings_no0 <- table_fledglings_no000 %>% 
+  add_global_p(anova_fun = drop1_output) %>% 
+  bold_p(t = 0.05) %>% 
+  bold_labels() %>%
+  italicize_levels() %>% 
+  modify_table_body(fun = function(.){
+    output <- left_join(x = .,
+                        y = drop1_output(x=full_fledglings_no0) %>% 
+                          dplyr::select(variable = term, Chisq=statistic, df),
+                        by = "variable")
+    output$df <- ifelse(output$row_type == "label",  output$df, NA)
+    output$Chisq <- ifelse(output$row_type == "label",  output$Chisq, NA)
+    return(output)
+  }) %>% 
+  modify_fmt_fun(c(Chisq) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(std.error) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(p.value) ~ function(x) style_number(x, digits = 3)) %>%
+  modify_table_body(~.x %>% dplyr::relocate(p.value, .after = df)) %>% 
+  modify_header(label ~ "**Fixed effect**") %>% 
+  modify_header(std.error ~ "**SE**") %>%
+  modify_header(estimate ~ "**Estimate**") %>%
+  modify_header(df ~ "**df**") %>% 
+  modify_header(Chisq ~ html("<b>&chi;<sup>2</sup></b>")) %>% 
+  as_gt() %>% 
+  opt_footnote_marks(marks = "LETTERS")
 
-m_chr_int <- update(m_mam, . ~ . + area + scale(chronotype) : area)
-anova(m_chr_int, update(m_mam, . ~ . + 
-                          area), test = "Chisq")
+##
+## save table
+gtsave(table_fledglings_no0, "./tables/TABLE S7.html")
 
-
-m_date2 <- update(m_mam, . ~ . + 
-                    poly(hatching_date_jul, 2)[, 1] +
-                    poly(hatching_date_jul, 2)[, 2])
-anova(m_date2, update(m_mam, . ~ . + 
-                        poly(hatching_date_jul, 2)[, 1]), test = "Chisq")
-
-m_date1 <- update(m_mam, . ~ . + 
-                    poly(hatching_date_jul, 2)[, 1])
-anova(m_date1, m_mam, test = "Chisq")
-
-m_habitat <- update(m_mam, . ~ . + area)
-anova(m_habitat, m_mam, test = "Chisq")
-
-
+#####
 
 ##
 ##
-##### Final model results #####
+##### Models for number of fledglings against absolute chronotype and Table S5 #####
 ##
 ##
+full_fledge_abs_chr_model <- glmer(fledglings ~
+                                     poly(hatching_date_jul,2)[,1] +
+                                     poly(hatching_date_jul,2)[,2] +
+                                     scale(chronotype_abs)+
+                                     area+
+                                     clutch_size+
+                                     (1|year) +
+                                     (1|site) +
+                                     (1|box), 
+                                   family = "poisson",
+                                   control = glmerControl(optimizer = "bobyqa"),
+                                   na.action = "na.fail",
+                                   data=data)
+summary(full_fledge_abs_chr_model)
 
-# final model
-top_model_fledglings <- lmer(fledglings ~
-                               chronotype+
-                               clutch_size +
-                               (1|site) +
-                               (1|year) +
-                               (1|box), 
-                             REML=F,
-                             na.action = "na.fail",
-                             data=dataledglings)
-summary(top_model_fledglings)
+##
+## Table of results S5
 
-# 95%CIs
-CI_onset <- confint(top_model_fledglings, 
-                    level = 0.95, 
-                    method = "boot", 
-                    nsim = 500, 
-                    boot.type = "norm")
+## base table
+table_fledglings_abs_chr00 <- full_fledge_abs_chr_model %>%
+  tbl_regression(intercept = T,
+                 label = list(
+                   `(Intercept)` = "Intercept",
+                   `poly(hatching_date_jul, 2)[, 1]` = "Hatching date1",
+                   `poly(hatching_date_jul, 2)[, 2]` = "Hatching date2",
+                   `clutch_size` = "Clutch size",
+                   `scale(chronotype_abs)` = "Clock female chronotype",
+                   `area` = "Habitat"),
+                 estimate_fun = ~ style_number(.x, digits = 2))
 
-#
+## add features
+table_fledglings_abs_chr <- table_fledglings_abs_chr00 %>% 
+  add_global_p(anova_fun = drop1_output) %>% 
+  bold_p(t = 0.05) %>% 
+  bold_labels() %>%
+  italicize_levels() %>% 
+  modify_table_body(fun = function(.){
+    output <- left_join(x = .,
+                        y = drop1_output(x=full_fledge_abs_chr_model) %>% 
+                          dplyr::select(variable = term, Chisq=statistic, df),
+                        by = "variable")
+    output$df <- ifelse(output$row_type == "label",  output$df, NA)
+    output$Chisq <- ifelse(output$row_type == "label",  output$Chisq, NA)
+    return(output)
+  }) %>% 
+  modify_fmt_fun(c(Chisq) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(std.error) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(p.value) ~ function(x) style_number(x, digits = 3)) %>%
+  modify_table_body(~.x %>% dplyr::relocate(p.value, .after = df)) %>% 
+  modify_header(label ~ "**Fixed effect**") %>% 
+  modify_header(std.error ~ "**SE**") %>%
+  modify_header(estimate ~ "**Estimate**") %>%
+  modify_header(df ~ "**df**") %>% 
+  modify_header(Chisq ~ html("<b>&chi;<sup>2</sup></b>")) %>% 
+  as_gt() %>% 
+  opt_footnote_marks(marks = "LETTERS")
+
+##
+## save table
+gtsave(table_fledglings_abs_chr, "./tables/TABLE S5.html")
+
+#####
+

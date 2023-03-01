@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2022-07-27
+#' Latest update: 2023-02-28
 #' 
 ###
 ###
@@ -27,11 +27,14 @@ rm(list=ls())
 ##### libraries #####
 ##
 ##
-pacman::p_load(openxlsx, 
+pacman::p_load(openxlsx, gt, gtsummary,
                lubridate, dplyr, tidyr, rptR,
                lme4, performance,
                ggplot2, extrafont)
 loadfonts()
+source("./scripts/FUNCTION_drop1_output.R")
+
+#####
 
 ##
 ##
@@ -58,6 +61,8 @@ data_weight <- data00 %>%
   filter(row_number() == 1) %>% 
   left_join(., y = weight_box, by = c("year", "box"))
 
+####
+
 ##
 ##
 ##### Model for nestling weight #####
@@ -66,11 +71,11 @@ data_weight <- data00 %>%
 full_weight <- lmer(avg_chickweight~ 
                       poly(hatching_date_jul,2)[,1] : area +
                       poly(hatching_date_jul,2)[,2] : area +
-                      chronotype:area+
+                      scale(chronotype):area+
 
                       poly(hatching_date_jul,2)[,1] +
                       poly(hatching_date_jul,2)[,2] +
-                      chronotype+
+                      scale(chronotype)+
                       area+
                       clutch_size+
                       (1|site) +
@@ -86,83 +91,128 @@ hist(residuals(full_weight))
 
 ##
 ##
-##### Model selection LRT #####
+##### Are interactions significant? #####
 ##
 ##
+
+## 1
 drop1(full_weight, test = "Chisq")
-m1 <- update(full_weight, . ~ . - chronotype:area)
 
-#1
-drop1(m1, test = "Chisq")
-m2 <- update(m1, . ~ . - area:poly(hatching_date_jul, 2)[, 2])
+## interaction 'area:poly(inc_start_aprildays,2)[,2]'
+anova(full_weight, 
+      update(full_weight, 
+             . ~ . - area:poly(hatching_date_jul, 2)[, 2]),
+      test = "LRT")
 
-#2
-drop1(m2, test = "Chisq")
-m3 <- update(m2, . ~ . - chronotype)
-
-#3
-drop1(m3, test = "Chisq")
-
-# mam
-m_mam <- m3
-summary(m_mam)
+## interaction 'scale(chronotype):area'
+anova(full_weight, 
+      update(full_weight, 
+             . ~ . 
+             - scale(chronotype):area),
+      test = "LRT")
 
 
-##
-##
-##### Likelihood-ratio test results #####
-##
-##
+## removing both interactions 
+full_model <- update(full_weight, 
+                     . ~ . 
+                     - scale(chronotype):area 
+                     - poly(hatching_date_jul,2)[,2] : area)
 
-# for effects in final model
-drop1(m_mam, test = "Chisq")
+## comparison model without any interaction against initial
+anova(full_weight, 
+      full_model,
+      test = "LRT")
 
-# p for non significant terms
-m_int <- update(m_mam, . ~ . + area:poly(hatching_date_jul, 2)[, 2])
-anova(m_int, m_mam, test = "Chisq")
-
-m_chr_int <- update(m_mam, . ~ . + chronotype + chronotype : area)
-anova(m_chr_int, update(m_mam, .~.+chronotype), test = "Chisq")
-
-m_chrono <- update(m_mam, . ~ . + chronotype)
-anova(m_chrono, m_mam, test = "Chisq")
-
-
+#####
 
 ##
 ##
 ##### Final model results #####
 ##
 ##
+summary(full_model)
+lmerTest::rand(full_model)
 
-# final model
-top_model_weight <- lmer(avg_chickweight~
-                           poly(hatching_date_jul,2,raw = T)[,1] : area +
-                           poly(hatching_date_jul,2,raw = T)[,1] +
-                           poly(hatching_date_jul,2,raw = T)[,2] +
-                           area +
-                           clutch_size +
-                           (1|site) +
-                           (1|year) +
-                           (1|box),  
-                         REML = T,
-                         na.action = "na.fail",
-                         data=data_weight)
-summary(top_model_weight)
-drop1(top_model_weight, test = "Chisq")
+drop1(full_model, test = "Chisq")
+summary(full_model)
 
-# 95%CIs
-CI_weight <- confint(m_mam, 
-                     level = 0.95, 
-                     method = "boot", 
-                     nsim = 500, 
-                     boot.type = "norm")
+#####
+
+##
+##
+##### Table of results 4 #####
+##
+##
+
+## base table
+table_weight00 <- full_model %>%
+  tbl_regression(intercept = T,
+                 label = list(
+                   `(Intercept)` = "Intercept",
+                   `poly(hatching_date_jul, 2)[, 1]` = "Hatching date1",
+                   `poly(hatching_date_jul, 2)[, 2]` = "Hatching date2",
+                   `clutch_size` = "Clutch size",
+                   `scale(chronotype)` = "Female chronotype",
+                   `area` = "Habitat", 
+                   `poly(hatching_date_jul, 2)[, 1]:areaForest` = "Hatching date1 x Habitat"),
+                 estimate_fun = ~ style_number(.x, digits = 2))
+
+## add features
+table_weight <- table_weight00 %>% 
+  add_global_p(anova_fun = drop1_output) %>% 
+  bold_p(t = 0.05) %>% 
+  bold_labels() %>%
+  italicize_levels() %>% 
+  modify_table_body(fun = function(.){
+    output <- left_join(x = .,
+                        y = drop1_output(x=full_model) %>% 
+                          dplyr::select(variable = term, Chisq=statistic, df),
+                        by = "variable")
+    output$df <- ifelse(output$row_type == "label",  output$df, NA)
+    output$Chisq <- ifelse(output$row_type == "label",  output$Chisq, NA)
+    return(output)
+  }) %>% 
+  modify_fmt_fun(c(Chisq) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(std.error) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(p.value) ~ function(x) style_number(x, digits = 3)) %>%
+  modify_table_body(~.x %>% dplyr::relocate(p.value, .after = df)) %>% 
+  modify_header(label ~ "**Fixed effect**") %>% 
+  modify_header(std.error ~ "**SE**") %>%
+  modify_header(estimate ~ "**Estimate**") %>%
+  modify_header(df ~ "**df**") %>% 
+  modify_header(Chisq ~ html("<b>&chi;<sup>2</sup></b>")) %>% 
+  as_gt() %>% 
+  opt_footnote_marks(marks = "LETTERS")
+
+##
+## save table
+gtsave(table_weight, "./tables/TABLE 4.html")
+
+#####
 
 ##
 ##
 ##### Plot model predictions #####
 ##
 ##
+
+##
+## model specification for predictions
+full_model_predictions <- lmer(avg_chickweight~ 
+                                 hatching_date_jul : area +
+
+                                 hatching_date_jul +
+                                 I(hatching_date_jul^2) +
+                                 chronotype+
+                                 area+
+                                 clutch_size+
+                                 (1|site) +
+                                 (1|year) +
+                                 (1|box), 
+                               REML = F,
+                               na.action = "na.fail",
+                               data=data_weight)
+
 
 # new dataframe to predict
 df_pred <- expand.grid(hatching_date_jul = seq(min(data_weight$hatching_date_jul), 
@@ -171,7 +221,10 @@ df_pred <- expand.grid(hatching_date_jul = seq(min(data_weight$hatching_date_jul
 df_pred$clutch_size <- ifelse(df_pred$area == "City", 
                               mean(data_weight$clutch_size[data_weight$area == "City"]),
                               mean(data_weight$clutch_size[data_weight$area == "Forest"]))
-df_pred$prediction <- predict(top_model_weight, df_pred, re.form = NA)
+df_pred$chronotype <- ifelse(df_pred$area == "City", 
+                              mean(data_weight$chronotype[data_weight$area == "City"]),
+                              mean(data_weight$chronotype[data_weight$area == "Forest"]))
+df_pred$prediction <- predict(full_model_predictions, df_pred, re.form = NA)
 
 # plot only data in range
 data_weight %>% 
@@ -189,15 +242,17 @@ df_pred <- df_pred[-c(remove_city, remove_forest),]
 
 
 # SE for mean predictions
-mm <- model.matrix(~ poly(hatching_date_jul,2,raw = T)[,1] : area +
-                     poly(hatching_date_jul,2,raw = T)[,1] +
-                     poly(hatching_date_jul,2,raw = T)[,2] +
-                     area +
+mm <- model.matrix(~ hatching_date_jul : area +
+                     
+                     hatching_date_jul +
+                     I(hatching_date_jul^2) +
+                     chronotype+
+                     area+
                      clutch_size,
                    data = df_pred)
 
 ## or newdat$distance <- mm %*% fixef(fm1)
-pvar1 <- diag(mm %*% tcrossprod(vcov(top_model_weight),mm))
+pvar1 <- diag(mm %*% tcrossprod(vcov(full_model_predictions),mm))
 cmult <- 1 ## 1 SE
 df_pred <- data.frame(
   df_pred
@@ -225,13 +280,12 @@ weight_plot <- ggplot(data = data_weight, aes(x = hatching_date_jul,
         axis.text = element_text("Arial", size = 10)) +
   geom_ribbon(data = df_pred, aes(ymin = plo, 
                                   ymax = phi, 
-                                  y = prediction,
-                                  shape = area),
+                                  y = prediction),
               alpha = 0.25,
               color = NA,
               position = position_dodge(width = 0.5)) +
   geom_line(data = df_pred, 
-            aes(y = prediction, shape = area), 
+            aes(y = prediction), 
             size = 1.5) +
   labs(x = "Hatching day (days after April 1)", 
        y = "Weight nestlings day 13 (g)") +

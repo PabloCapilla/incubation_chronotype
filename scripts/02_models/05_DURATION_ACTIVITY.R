@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2022-07-27
+#' Latest update: 2023-02-27
 #' 
 ###
 ###
@@ -27,11 +27,14 @@ rm(list=ls())
 ##### libraries #####
 ##
 ##
-pacman::p_load(openxlsx, 
+pacman::p_load(openxlsx, gtsummary, gt,
                lubridate, dplyr, tidyr, rptR,
                lme4, performance,
                ggplot2, extrafont)
 loadfonts()
+source("./scripts/FUNCTION_drop1_output.R")
+
+#####
 
 ##
 ##
@@ -64,6 +67,8 @@ data<- data %>% filter(activity_end_relative > -300)
 ## duration of activity in min
 data$duration_act <- as.numeric(data$activity_end_abs - data$activity_onset_abs)
 
+#####
+
 ##
 ##
 ##### Models for duration of activity #####
@@ -85,166 +90,199 @@ day_length_model <- lmer(duration_act ~
                            area + 
                            meantemp +
                            clutch_size + 
+                           (1|year) +
                            (1|site) +
-                           (1|box) +
-                           (1|year),
+                           (1|box),
                          na.action = "na.fail",
                          REML = F,                 
                          data=data) 
 summary(day_length_model)
 
 # model diagnostics
-check_model(day_length_model, panel = F) # not too bad overall
+check_model(day_length_model, panel = T) # not too bad overall
 
-# significance of random effects 
-lmerTest::rand(day_length_model)
-
-# maternal repeatability of relative onset of activity
-as.numeric(summary(day_length_model)$varcor[1]) / 
-  (as.numeric(summary(day_length_model)$varcor[1]) + 
-     as.numeric(summary(day_length_model)$varcor[2]) +
-     as.numeric(summary(day_length_model)$varcor[3]) +
-     summary(day_length_model)$sigma^2)
+#####
 
 ##
 ##
-##### Model selection LRT #####
+##### Are interactions significant? #####
 ##
 ##
+
+## 1
 drop1(day_length_model, test = "Chisq")
-m1 <- update(day_length_model, . ~ . - area:poly(inc_start_aprildays, 2)[, 2])
 
-#1
-drop1(m1, test = "Chisq")
-m2 <- update(m1, . ~ . - poly(inc_start_aprildays, 2)[, 2])
+## interaction 'area:poly(inc_start_aprildays,2)[,2]'
+anova(day_length_model, update(day_length_model, 
+                                   . ~ . - area:poly(inc_start_aprildays,2)[,2]),
+      test = "LRT")
 
-#2
-drop1(m2, test = "Chisq")
-m3 <- update(m2, . ~ . - poly(day_before_hatch, 2)[, 2]:area)
+## interaction 'area:poly(inc_start_aprildays, 2)[, 1]'
+anova(day_length_model, 
+      update(day_length_model, 
+             . ~ . - area:poly(inc_start_aprildays, 2)[, 1]),
+      test = "LRT")
 
-#3
-drop1(m3, test = "Chisq")
-m4 <- update(m3, . ~ . - meantemp)
+## interaction 'area:poly(day_before_hatch, 2)[, 2]'
+anova(day_length_model, 
+      update(day_length_model, 
+             . ~ . - area:poly(day_before_hatch, 2)[, 2]),
+      test = "LRT")
 
-#4
-drop1(m4, test = "Chisq")
-m5 <- update(m4, . ~ . - clutch_size)
+## removing both interactions 
+full_model <- update(day_length_model, 
+                     . ~ . 
+                     - area:poly(inc_start_aprildays, 2)[, 2] 
+                     - area:poly(inc_start_aprildays, 2)[, 1]
+                     - area:poly(day_before_hatch, 2)[, 2])
 
-#5
-drop1(m5, test = "Chisq")
-m6 <- update(m5, . ~ . - poly(day_before_hatch, 2)[, 2])
+drop1(full_model, test = "Chisq")
+summary(full_model)
 
-#6
-drop1(m6, test = "Chisq")
-
-# Final model
-m_mam <- m6
-summary(m_mam)
-
-
-##
-##
-##### Likelihood-ratio test results #####
-##
-##
-
-# for effects in final model
-drop1(m_mam, test = "Chisq")
-
-# p for non significant terms
-m_clutch_size <- update(m_mam, . ~ . + clutch_size)
-anova(m_clutch_size, m_mam, test = "Chisq")
-
-m_int <- update(m_mam, . ~ . + poly(day_before_hatch, 2)[, 2])
-anova(m_int, m_mam, test = "Chisq")
-
-m_aprildays2 <- update(m_mam, . ~ . + poly(inc_start_aprildays, 2)[, 2])
-anova(m_aprildays2, m_mam, test = "Chisq")
-
-m_meantemp <- update(m_mam, . ~ . + meantemp)
-anova(m_meantemp, m_mam, test = "Chisq")
-
-m_hatch_int1 <- update(m_mam, . ~ . + poly(day_before_hatch, 2)[, 2] + poly(day_before_hatch, 2)[, 2]:area)
-m_hatch_int2 <- update(m_mam, . ~ . + poly(day_before_hatch, 2)[, 2])
-anova(m_hatch_int1, m_hatch_int2, test = "Chisq")
-
-m_days_int1 <- update(m_mam, . ~ . + poly(inc_start_aprildays, 2)[, 2] + poly(inc_start_aprildays, 2)[, 2]:area)
-m_days_int2 <- update(m_mam, . ~ . + poly(inc_start_aprildays, 2)[, 2])
-anova(m_days_int1, m_days_int2, test = "Chisq")
-
+#####
 
 ##
 ##
 ##### Final model results #####
 ##
 ##
+summary(full_model)
+lmerTest::rand(full_model)
 
-# final model
-day_length_final <- lmer(duration_act/60 ~ 
-                           area:inc_start_aprildays +  
-                           area:day_before_hatch +  
-                           inc_start_aprildays +
-                           day_before_hatch +
-                           area + 
-                           (1|site) +
-                           (1|box) +
-                           (1|year),
-                         REML = T,                 
-                         data=data)
-summary(day_length_final)
+# maternal repeatability of absolute onset of activity
+as.numeric(summary(full_model)$varcor[1]) / 
+  ((as.numeric(summary(full_model)$varcor[1]) + 
+      (as.numeric(summary(full_model)$varcor[2])) +
+      (as.numeric(summary(full_model)$varcor[3])) +
+      summary(full_model)$sigma^2))
 
-# 95%CIs
-CI_onset <- confint(day_length_final, 
-                    level = 0.95, 
-                    method = "boot", 
-                    nsim = 500, 
-                    boot.type = "norm")
+# maternal repeatability with 95%CI of absolute onset of activity
+rep_day_length <- rpt(duration_act ~ 
+                        area:poly(day_before_hatch,2)[,1] +  
+                        
+                        poly(inc_start_aprildays,2)[,2] +
+                        poly(inc_start_aprildays,2)[,1] +
+                        poly(day_before_hatch,2)[,2] +
+                        poly(day_before_hatch,2)[,1] +
+                        area + 
+                        meantemp +
+                        clutch_size + 
+                        (1|year) +
+                        (1|site) +
+                        (1|box), 
+                      grname = "box", 
+                      data = data, 
+                      datatype = "Gaussian", 
+                      nboot = 1000, 
+                      npermut = 0)
+summary(rep_day_length)
 
-# maternal repeatability of absolute end of activity
-as.numeric(summary(day_length_final)$varcor[1]) / 
-  ((as.numeric(summary(day_length_final)$varcor[1]) + 
-      (as.numeric(summary(day_length_final)$varcor[2])) +
-      (as.numeric(summary(day_length_final)$varcor[3])) +
-      summary(day_length_final)$sigma^2))
+#####
 
-# maternal repeatability with 95%CI of duration of active day
-rep_duration <- rpt(duration_act/60 ~ 
-                             area:inc_start_aprildays +  
-                             area:day_before_hatch +  
-                             inc_start_aprildays +
-                             day_before_hatch +
-                             area + 
-                             (1|site) +
-                             (1|box) +
-                             (1|year), 
-                           grname = "box", 
-                           data = data, 
-                           datatype = "Gaussian", 
-                           nboot = 1000, 
-                           npermut = 0)
+##
+##
+##### Table of results S4 #####
+##
+##
+
+## base table
+table_day_length00 <- full_model %>%
+  tbl_regression(intercept = T,
+                 label = list(
+                   `(Intercept)` = "Intercept",
+                   `poly(inc_start_aprildays, 2)[, 1]`  = "Incubation start date1", 
+                   `poly(inc_start_aprildays, 2)[, 2]`  = "Incubation start date2",
+                   `poly(day_before_hatch, 2)[, 1]` = "Days before hatching1",
+                   `poly(day_before_hatch, 2)[, 2]` = "Days before hatching2",
+                   `meantemp` = "Mean daily temperatures",
+                   `clutch_size` = "Clutch size",
+                   `area` = "Habitat",
+                   `poly(day_before_hatch, 2)[, 1]:area` = "Days before hatching1 x Habitat"),
+                 estimate_fun = ~ style_number(.x, digits = 2))
+
+## add features
+table_day_length <- table_day_length00 %>% 
+  add_global_p(anova_fun = drop1_output) %>% 
+  bold_p(t = 0.05) %>% 
+  bold_labels() %>%
+  italicize_levels() %>% 
+  modify_table_body(fun = function(.){
+    output <- left_join(x = .,
+                        y = drop1_output(x=full_model) %>% 
+                          dplyr::select(variable = term, Chisq=statistic, df),
+                        by = "variable")
+    output$df <- ifelse(output$row_type == "label",  output$df, NA)
+    output$Chisq <- ifelse(output$row_type == "label",  output$Chisq, NA)
+    return(output)
+  }) %>% 
+  modify_fmt_fun(c(Chisq) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(std.error) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(p.value) ~ function(x) style_number(x, digits = 3)) %>%
+  modify_table_body(~.x %>% dplyr::relocate(p.value, .after = df)) %>% 
+  modify_header(label ~ "**Fixed effect**") %>% 
+  modify_header(std.error ~ "**SE**") %>%
+  modify_header(estimate ~ "**Estimate**") %>%
+  modify_header(df ~ "**df**") %>% 
+  modify_header(Chisq ~ html("<b>&chi;<sup>2</sup></b>")) %>% 
+  as_gt() %>% 
+  opt_footnote_marks(marks = "LETTERS")
+
+##
+## save table
+gtsave(table_day_length, "./tables/TABLE S4.html")
+
+#####
+
 ##
 ##
 ##### Plot model predictions #####
 ##
 ##
 
+# full model for predictions
+full_model_predictions <- lmer(duration_act ~ 
+                                 area:day_before_hatch +  
+                                 
+                                 I(inc_start_aprildays^2) +
+                                 inc_start_aprildays +
+                                 I(day_before_hatch^2) +
+                                 day_before_hatch +
+                                 meantemp +
+                                 clutch_size + 
+                                 area + 
+                                 (1|year/site) +
+                                 (1|box), 
+                               REML = F,
+                               na.action = "na.fail",
+                               data= data) 
+
+
+
 # new dataframe to predict
 df_pred <- expand.grid(day_before_hatch = seq(min(data$day_before_hatch), 
                                               max(data$day_before_hatch), 1),
                        area = c("City", "Forest"),
+                       meantemp = mean(data$meantemp),
                        inc_start_aprildays = seq(min(data$inc_start_aprildays), 
                                                  max(data$inc_start_aprildays), 1))
-df_pred$prediction <- predict(day_length_final, df_pred, re.form = NA)
+df_pred$clutch_size <- NA
+df_pred$clutch_size[df_pred$area == "Forest"] <- mean(data$clutch_size[data$area == "Forest"])
+df_pred$clutch_size[df_pred$area == "City"] <- mean(data$clutch_size[data$area == "City"])
+df_pred$prediction <- predict(full_model_predictions, df_pred, re.form = NA)
 
 # SE for mean predictions
-mm <- model.matrix(~ area:inc_start_aprildays +  
-                     area:day_before_hatch +  
+mm <- model.matrix(~ area:day_before_hatch +  
+                     
+                     I(inc_start_aprildays^2) +
                      inc_start_aprildays +
+                     I(day_before_hatch^2) +
                      day_before_hatch +
+                     meantemp +
+                     clutch_size + 
                      area,
                    data = df_pred)
 
-pvar1 <- diag(mm %*% tcrossprod(vcov(day_length_final),mm))
+pvar1 <- diag(mm %*% tcrossprod(vcov(full_model_predictions),mm))
 cmult <- 1 ## 1 SE
 df_pred <- data.frame(
   df_pred
@@ -266,9 +304,14 @@ remove_forest <- which((df_pred$inc_start_aprildays < 28 |
                          df_pred$area == "Forest")
 df_pred <- df_pred[-c(remove_city, remove_forest),]
 
+#####
 
-## 
-## plot days to hatching - duration
+
+##
+##
+##### Plot days to hatching - duration #####
+##
+##
 duration_hatch_plot <- ggplot(data = data, 
                               aes(x = day_before_hatch, 
                                   y = duration_act,
@@ -325,9 +368,13 @@ duration_hatch_plot <- ggplot(data = data,
 #       width = 125, 
 #       height = 125)  
 
+#####
 
 ##
-## plot for days from April 1 - Figure S2
+##
+##### Plot for days from April 1 - Figure S2 #####
+##
+##
 duration_abs_date <- ggplot(data = data, 
                             aes(x = inc_start_aprildays, 
                                 y = duration_act,
@@ -378,7 +425,7 @@ ggsave(filename = "./plots/Figure S3.jpeg",
        width = 135, 
        height = 100)  
 
-
+#####
 
 
 

@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2022-07-27
+#' Latest update: 2023-02-28
 #' 
 ###
 ###
@@ -27,11 +27,14 @@ rm(list=ls())
 ##### libraries #####
 ##
 ##
-pacman::p_load(openxlsx, 
+pacman::p_load(openxlsx, gt, gtsummary,
                lubridate, dplyr, tidyr,
                lme4, performance, rptR,
                ggplot2, extrafont)
 loadfonts()
+source("./scripts/FUNCTION_drop1_output.R")
+
+#####
 
 ##
 ##
@@ -41,7 +44,7 @@ loadfonts()
 data <- readRDS("./data/data_incubation.RDS")
 head(data)
 
-
+#####
 
 ##
 ##
@@ -93,167 +96,201 @@ data %>%
             n_size = n(),
             sd_date = sd(mean_box/sqrt(n())))
 
-# 
+##### 
 
 ##
 ##### models for relative onset of activity #####
 ##
 ##
 model_relative_onset <- lmer(activity_onset_relative ~ 
-                              area:poly(inc_start_aprildays,2)[,2] + 
-                              area:poly(inc_start_aprildays,2)[,1] +  
-                              
-                              area:poly(day_before_hatch,2)[,2] + 
-                              area:poly(day_before_hatch,2)[,1] +  
-                              
-                              poly(inc_start_aprildays,2)[,2] +
-                              poly(inc_start_aprildays,2)[,1] +
-                              poly(day_before_hatch,2)[,2] +
-                              poly(day_before_hatch,2)[,1] +
-                              area + 
-                              meantemp +
-                              clutch_size + 
-                              (1|site) +
-                              (1|box) +
-                              (1|year), 
-                            REML = F,
-                            na.action = "na.fail",
-                            data= data) #full model
+                               area:poly(inc_start_aprildays,2)[,2] + 
+                               area:poly(inc_start_aprildays,2)[,1] +  
+                               
+                               area:poly(day_before_hatch,2)[,2] + 
+                               area:poly(day_before_hatch,2)[,1] +  
+                               
+                               poly(inc_start_aprildays,2)[,2] +
+                               poly(inc_start_aprildays,2)[,1] +
+                               poly(day_before_hatch,2)[,2] +
+                               poly(day_before_hatch,2)[,1] +
+                               area + 
+                               meantemp +
+                               clutch_size + 
+                               (1|year)+
+                               (1|site) +
+                               (1|box), 
+                             REML = F,
+                             na.action = "na.fail",
+                             data= data) #full model
 summary(model_relative_onset)
 
 # model diagnostics
-check_model(model_relative_onset, panel = F) # not too bad overall
+check_model(model_relative_onset, panel = T) # not too bad overall
 
-
-# maternal repeatability of absolute onset of activity
-as.numeric(summary(model_relative_onset)$varcor[1]) / 
-  (as.numeric(summary(model_relative_onset)$varcor[1]) +
-     as.numeric(summary(model_relative_onset)$varcor[2]) + 
-     as.numeric(summary(model_relative_onset)$varcor[3]) +
-     summary(model_relative_onset)$sigma^2)
-
+#####
 
 
 ##
 ##
-##### Model selection LRT #####
+##### Are interactions significant? #####
 ##
 ##
+
+## 1
 drop1(model_relative_onset, test = "Chisq")
-m1 <- update(model_relative_onset, . ~ . - clutch_size)
 
-#1
-drop1(m1, test = "Chisq")
-m2 <- update(m1, . ~ . - poly(day_before_hatch, 2)[, 2]:area)
+## interaction 'area:poly(inc_start_aprildays,2)[,2]'
+anova(model_relative_onset, update(model_relative_onset, 
+                                   . ~ . - area:poly(inc_start_aprildays,2)[,2]),
+      test = "LRT")
 
-#2
-drop1(m2, test = "Chisq")
-m3 <- update(m2, . ~ . - meantemp)
+## interaction 'area:poly(day_before_hatch, 2)[, 2]'
+anova(model_relative_onset, update(model_relative_onset, 
+                                   . ~ . - area:poly(day_before_hatch, 2)[, 2]),
+      test = "LRT")
 
-#3
-drop1(m3, test = "Chisq")
-m4 <- update(m3, . ~ . - poly(inc_start_aprildays, 2)[, 2]:area)
+## removing both interactions 
+full_model <- update(model_relative_onset, 
+                     . ~ . 
+                     - area:poly(inc_start_aprildays,2)[,2] 
+                     - area:poly(day_before_hatch, 2)[, 2])
 
-#4
-drop1(m4, test = "Chisq")
-m5 <- update(m4, . ~ . - poly(inc_start_aprildays, 2)[, 2])
+drop1(full_model, test = "Chisq")
+summary(full_model)
 
-#mam
-m_mam <- m5
-summary(m_mam)
-
-# 95%CIs
-CI_onset <- confint(m_mam, 
-                    level = 0.95, 
-                    method = "boot", 
-                    nsim = 500, 
-                    boot.type = "norm")
-
-##
-##
-##### Likelihood-ratio test results #####
-##
-##
-
-# for effects in final model
-drop1(m_mam, test = "Chisq")
-
-# for effects not in final model
-m_clutch_size <- update(m_mam, . ~ . + clutch_size)
-anova(m_clutch_size, m_mam, test = "Chisq")
-
-m_int <- update(m_mam, . ~ . + poly(day_before_hatch, 2)[, 2]:area)
-anova(m_int, m_mam, test = "Chisq")
-
-m_meantemp <- update(m_mam, . ~ . + meantemp)
-anova(m_meantemp, m_mam, test = "Chisq")
-
-m_aprildays2 <- update(m_mam, . ~ . + poly(inc_start_aprildays, 2)[, 2])
-m_aprildays3 <- update(m_mam, . ~ . + poly(inc_start_aprildays, 2)[, 2] + poly(inc_start_aprildays, 2)[, 2]:area)
-anova(m_aprildays2, m_mam, test = "Chisq")
-anova(m_aprildays3, m_aprildays2, test = "Chisq")
-
+#####
 
 ##
 ##
 ##### Final model results #####
 ##
 ##
-top_relative_onset <- lmer(activity_onset_relative ~ 
-                          area:inc_start_aprildays + 
-                          area:day_before_hatch +
-                          
-                          I(day_before_hatch^2) +
-                          day_before_hatch +
-                          inc_start_aprildays +
-                          area + 
-                          (1|site) +
-                          (1|box) +
-                          (1|year),
-                        REML = T,
-                        na.action = "na.fail",
-                        data=data)
-summary(top_relative_onset)
+summary(full_model)
+lmerTest::rand(full_model)
 
-# maternal repeatability of relative onset of activity
-as.numeric(summary(top_relative_onset)$varcor[1]) / 
-  ((as.numeric(summary(top_relative_onset)$varcor[1]) + 
-      (as.numeric(summary(top_relative_onset)$varcor[2])) +
-      (as.numeric(summary(top_relative_onset)$varcor[3])) +
-      summary(top_relative_onset)$sigma^2))
+# maternal repeatability of absolute onset of activity
+as.numeric(summary(full_model)$varcor[1]) / 
+  ((as.numeric(summary(full_model)$varcor[1]) + 
+      (as.numeric(summary(full_model)$varcor[2])) +
+      (as.numeric(summary(full_model)$varcor[3])) +
+      summary(full_model)$sigma^2))
 
 # maternal repeatability with 95%CI of relative onset of activity
 rep_relative_onset <- rpt(activity_onset_relative ~ 
-                            area:inc_start_aprildays + 
-                            area:day_before_hatch +
+                            area:poly(inc_start_aprildays,2)[,1] +  
+                            area:poly(day_before_hatch,2)[,1] +  
                             
-                            I(day_before_hatch^2) +
-                            day_before_hatch +
-                            inc_start_aprildays +
+                            poly(inc_start_aprildays,2)[,2] +
+                            poly(inc_start_aprildays,2)[,1] +
+                            poly(day_before_hatch,2)[,2] +
+                            poly(day_before_hatch,2)[,1] +
+                            
+                            meantemp +
+                            clutch_size + 
                             area + 
+                            (1|year)+
                             (1|site) +
-                            (1|box) +
-                            (1|year), 
-                          grname = c("box", "Fixed"), 
+                            (1|box), 
+                          grname = c("box"), 
                           data = data, 
                           datatype = "Gaussian", 
                           nboot = 1000, 
                           npermut = 0)
 summary(rep_relative_onset)
 
+#####
+
+##
+##
+##### Table of results 2 #####
+##
+##
+
+## base table
+table_relative_onset00 <- full_model %>%
+  tbl_regression(intercept = T,
+                 label = list(
+                   `(Intercept)` = "Intercept",
+                   `poly(inc_start_aprildays, 2)[, 1]`  = "Incubation start date1", 
+                   `poly(inc_start_aprildays, 2)[, 2]`  = "Incubation start date2",
+                   `poly(day_before_hatch, 2)[, 1]` = "Days before hatching1",
+                   `poly(day_before_hatch, 2)[, 2]` = "Days before hatching2",
+                   `meantemp` = "Mean daily temperatures",
+                   `clutch_size` = "Clutch size",
+                   `area` = "Habitat",
+                   `poly(inc_start_aprildays, 2)[, 1]:areaForest` = "Incubation start date1 x Habitat",
+                   `poly(day_before_hatch, 2)[, 1]:areaForest` = "Days before hatching1 x Habitat"),
+                 estimate_fun = ~ style_number(.x, digits = 2))
+
+## add features
+table_relative_onset <- table_relative_onset00 %>% 
+  add_global_p(anova_fun = drop1_output) %>% 
+  bold_p(t = 0.05) %>% 
+  bold_labels() %>%
+  italicize_levels() %>% 
+  modify_table_body(fun = function(.){
+    output <- left_join(x = .,
+                        y = drop1_output(x=full_model) %>% 
+                          dplyr::select(variable = term, Chisq=statistic, df),
+                        by = "variable")
+    output$df <- ifelse(output$row_type == "label",  output$df, NA)
+    output$Chisq <- ifelse(output$row_type == "label",  output$Chisq, NA)
+    return(output)
+  }) %>% 
+  modify_fmt_fun(c(Chisq) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(std.error) ~ function(x) style_number(x, digits = 2)) %>%
+  modify_fmt_fun(c(p.value) ~ function(x) style_number(x, digits = 3)) %>%
+  modify_table_body(~.x %>% dplyr::relocate(p.value, .after = df)) %>% 
+  modify_header(label ~ "**Fixed effect**") %>% 
+  modify_header(std.error ~ "**SE**") %>%
+  modify_header(estimate ~ "**Estimate**") %>%
+  modify_header(df ~ "**df**") %>% 
+  modify_header(Chisq ~ html("<b>&chi;<sup>2</sup></b>")) %>% 
+  as_gt() %>% 
+  opt_footnote_marks(marks = "LETTERS")
+
+##
+## save table
+gtsave(table_relative_onset, "./tables/TABLE 2.html")
+
+#####
+
 ##
 ##
 ##### Plot model predictions #####
 ##
 ##
+full_model_predictions <- lmer(activity_onset_relative ~ 
+                                 area:inc_start_aprildays +  
+                                 area:day_before_hatch +  
+                                 
+                                 I(inc_start_aprildays^2) +
+                                 inc_start_aprildays +
+                                 I(day_before_hatch^2) +
+                                 day_before_hatch +
+                                 meantemp +
+                                 clutch_size + 
+                                 area + 
+                                 (1|year/site) +
+                                 (1|box), 
+                               REML = F,
+                               na.action = "na.fail",
+                               data= data) #full model
+summary(full_model_predictions)
 
 # new dataframe to predict
 df_pred <- expand.grid(day_before_hatch = seq(min(data$day_before_hatch), 
                                               max(data$day_before_hatch), 1),
                        area = c("City", "Forest"),
+                       meantemp = mean(data$meantemp),
                        inc_start_aprildays = seq(min(data$inc_start_aprildays), 
-                                             max(data$inc_start_aprildays), 1))
-df_pred$prediction <- predict(top_relative_onset, df_pred, re.form = NA)
+                                                 max(data$inc_start_aprildays), 1))
+df_pred$clutch_size <- NA
+df_pred$clutch_size[df_pred$area == "Forest"] <- mean(data$clutch_size[data$area == "Forest"])
+df_pred$clutch_size[df_pred$area == "City"] <- mean(data$clutch_size[data$area == "City"])
+
+df_pred$prediction <- predict(full_model_predictions, df_pred, re.form = NA)
+
 
 # plot only data in range
 data %>% 
@@ -270,15 +307,18 @@ remove_forest <- which((df_pred$inc_start_aprildays < 28 |
 df_pred <- df_pred[-c(remove_city, remove_forest),]
 
 # SE for mean predictions
-mm <- model.matrix(~ area:inc_start_aprildays + 
-                     area:day_before_hatch +
+mm <- model.matrix(~ area:inc_start_aprildays +  
+                     area:day_before_hatch +  
                      
+                     I(inc_start_aprildays^2) +
+                     inc_start_aprildays +
                      I(day_before_hatch^2) +
                      day_before_hatch +
-                     inc_start_aprildays +
+                     meantemp +
+                     clutch_size + 
                      area,
                    data = df_pred)
-pvar1 <- diag(mm %*% tcrossprod(vcov(top_relative_onset),mm))
+pvar1 <- diag(mm %*% tcrossprod(vcov(full_model_predictions),mm))
 cmult <- 1 ## 1 SE
 df_pred <- data.frame(
   df_pred
@@ -305,12 +345,11 @@ relative_onset_hatching <- ggplot(data = data,
              shape = 21, 
              color = "black") +
   theme_bw() +
-  #stat_smooth(method = "lm", formula = y ~ poly(x,2)) +
   theme(legend.position = "top",
-        legend.text = element_text("Arial", size = 10),
+        legend.text = element_text("Arial", size = 17),
         panel.grid = element_blank(),
-        axis.title = element_text("Arial", size = 10),
-        axis.text = element_text("Arial", size = 10)) +
+        axis.title = element_text("Arial", size = 15),
+        axis.text = element_text("Arial", size = 13)) +
   geom_errorbar(data = df_pred %>% 
                   group_by(area, day_before_hatch) %>% 
                   summarise(mean_plo = mean(plo),
@@ -336,16 +375,16 @@ relative_onset_hatching <- ggplot(data = data,
   labs(x = "Days before hatching", 
        y = "Onset of activity (minutes after sunrise)") +
   scale_x_continuous(breaks = -15:-1, labels = 15:1) +
-  scale_fill_manual(name = "", labels = c("City", "Forest"), 
+  scale_fill_manual(name = "", labels = c("Urban", "Forest"), 
                     values = c("#af8dc3", "#7fbf7b")) +
-  scale_color_manual(name = "", labels = c("City", "Forest"), 
+  scale_color_manual(name = "", labels = c("Urban", "Forest"), 
                      values = c("#af8dc3", "#7fbf7b")) +
   geom_text(aes(-2, -15), 
             label = "Sunrise time", vjust = -1, 
             size = 4,
             color = "black") 
 
-ggsave(filename = "./plots/Figure S4a.png", 
+ggsave(filename = "./plots/Figure S5a.png", 
        plot = relative_onset_hatching, 
        device = "png", 
        units = "mm",
