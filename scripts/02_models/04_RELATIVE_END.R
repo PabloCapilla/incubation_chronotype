@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2023-02-28
+#' Latest update: 2023-05-16
 #' 
 ###
 ###
@@ -222,7 +222,7 @@ summary(rep_relative_end)
 
 ##
 ##
-##### Table of results S3 #####
+##### Table of results A3 #####
 ##
 ##
 
@@ -270,7 +270,7 @@ table_relative_end <- table_relative_end00 %>%
 
 ##
 ## save table
-gtsave(table_relative_end, "./tables/TABLE S3.html")
+gtsave(table_relative_end, "./tables/TABLE A3.html")
 
 #####
 
@@ -291,7 +291,8 @@ full_model_predictions <- lmer(activity_end_relative ~
                                  meantemp +
                                  clutch_size + 
                                  area + 
-                                 (1|year/site) +
+                                 (1|year) +
+                                 (1|site) +
                                  (1|box), 
                                REML = F,
                                na.action = "na.fail",
@@ -404,7 +405,7 @@ relative_end_hatching <- ggplot(data = data,
             color = "black") 
 
 
-ggsave(filename = "./plots/Figure S5b.png", 
+ggsave(filename = "./plots/Figure A5b.png", 
        plot = relative_end_hatching, 
        device = "png", 
        units = "mm",
@@ -470,7 +471,7 @@ relative_end_date <- ggplot(data = data,
             color = "black") 
 
 
-ggsave(filename = "./plots/Figure S2cd.png", 
+ggsave(filename = "./plots/Figure A2cd.png", 
        plot = relative_end_date, 
        device = "png", 
        units = "mm",

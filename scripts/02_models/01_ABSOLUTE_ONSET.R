@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2023-02-27
+#' Latest update: 2023-05-16
 #' 
 ###
 ###
@@ -355,11 +355,12 @@ min_time <- min(times(strftime(dmy_hm(data$first_offbout),"%H:%M:%S", tz = "UTC"
 max_time <- max(times(strftime(dmy_hm(data$first_offbout),"%H:%M:%S", tz = "UTC")))
 hm <- merge(0:23, seq(0, 30, by = 30))
 
-interval_15min <- data.frame('INTERVAL' = chron(time = paste(hm$x, ':', hm$y, ':', 0)))
+interval_15min <- data.frame('INTERVAL' = chron(time = paste0(hm$x, ':', hm$y, ':', 0)))
 interval_15min <- data.frame('INTERVAL' = interval_15min[order(interval_15min$INTERVAL), ])
 labels_time <- substr(interval_15min[!interval_15min$INTERVAL <= min_time & !interval_15min$INTERVAL >= max_time,],
                       start = 0, 
                       stop = 5)
+labels_time <- sub(x = labels_time, pattern = ":", replacement = "")
 
 
 ## 
@@ -415,7 +416,7 @@ absolute_onset_hatching <- ggplot(data = data,
                      values = c("#af8dc3", "#7fbf7b"))
 
 
-ggsave(filename = "./plots/Figure S4a.png", 
+ggsave(filename = "./plots/Figure A4a.png", 
        plot = absolute_onset_hatching, 
        device = "png", 
        units = "mm",

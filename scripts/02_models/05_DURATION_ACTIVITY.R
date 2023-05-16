@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2023-02-27
+#' Latest update: 2023-05-16
 #' 
 ###
 ###
@@ -181,7 +181,7 @@ summary(rep_day_length)
 
 ##
 ##
-##### Table of results S4 #####
+##### Table of results A4 #####
 ##
 ##
 
@@ -229,7 +229,7 @@ table_day_length <- table_day_length00 %>%
 
 ##
 ## save table
-gtsave(table_day_length, "./tables/TABLE S4.html")
+gtsave(table_day_length, "./tables/TABLE A4.html")
 
 #####
 
@@ -250,13 +250,12 @@ full_model_predictions <- lmer(duration_act ~
                                  meantemp +
                                  clutch_size + 
                                  area + 
-                                 (1|year/site) +
+                                 (1|year) +
+                                 (1|site) +
                                  (1|box), 
                                REML = F,
                                na.action = "na.fail",
                                data= data) 
-
-
 
 # new dataframe to predict
 df_pred <- expand.grid(day_before_hatch = seq(min(data$day_before_hatch), 
@@ -372,7 +371,7 @@ duration_hatch_plot <- ggplot(data = data,
 
 ##
 ##
-##### Plot for days from April 1 - Figure S2 #####
+##### Plot for days from April 1 - Figure A3 #####
 ##
 ##
 duration_abs_date <- ggplot(data = data, 
@@ -418,7 +417,7 @@ duration_abs_date <- ggplot(data = data,
                      values = c("#af8dc3", "#7fbf7b")) 
 
 
-ggsave(filename = "./plots/Figure S3.jpeg", 
+ggsave(filename = "./plots/Figure A3.jpeg", 
        plot = duration_abs_date, 
        device = "jpeg", 
        units = "mm",

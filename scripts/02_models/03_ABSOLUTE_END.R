@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2023-02-27
+#' Latest update: 2023-05-16
 #' 
 ###
 ###
@@ -223,7 +223,7 @@ summary(rep_absolute_end)
 
 ##
 ##
-##### Table of results S2 #####
+##### Table of results A2 #####
 ##
 ##
 
@@ -271,7 +271,7 @@ table_absolute_end <- table_absolute_end00 %>%
 
 ##
 ## save table
-gtsave(table_absolute_end, "./tables/TABLE S2.html")
+gtsave(table_absolute_end, "./tables/TABLE A2.html")
 
 #####
 
@@ -292,7 +292,8 @@ full_model_predictions <- lmer(activity_end_abs ~
                                  meantemp +
                                  clutch_size + 
                                  area + 
-                                 (1|year/site) +
+                                 (1|year) +
+                                 (1|site) +
                                  (1|box), 
                                REML = F,
                                na.action = "na.fail",
@@ -365,6 +366,7 @@ interval_15min <- data.frame('INTERVAL' = interval_15min[order(interval_15min$IN
 labels_time <- substr(interval_15min[!interval_15min$INTERVAL <= min_time & !interval_15min$INTERVAL >= max_time,],
                       start = 0, 
                       stop = 5)
+labels_time <- sub(x = labels_time, pattern = ":", replacement = "")
 
 
 ## 
@@ -418,7 +420,7 @@ absolute_end_hatching <- ggplot(data = data,
   scale_color_manual(name = "", labels = c("Urban", "Forest"), 
                      values = c("#af8dc3", "#7fbf7b"))
 
-ggsave(filename = "./plots/Figure S4b.png", 
+ggsave(filename = "./plots/Figure A4b.png", 
        plot = absolute_end_hatching, 
        device = "png", 
        units = "mm",
@@ -478,7 +480,7 @@ absolute_end_date <- ggplot(data = data,
                      values = c("black", "#7fbf7b", "#af8dc3"))
 
 
-ggsave(filename = "./plots/Figure S2ab.png", 
+ggsave(filename = "./plots/Figure A2ab.png", 
        plot = absolute_end_date, 
        device = "png", 
        units = "mm",

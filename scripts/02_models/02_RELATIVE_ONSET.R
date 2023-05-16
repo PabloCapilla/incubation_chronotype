@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2023-02-28
+#' Latest update: 2023-05-16
 #' 
 ###
 ###
@@ -94,7 +94,8 @@ data %>%
   group_by(area) %>% 
   summarise(mean_date = mean(mean_box),
             n_size = n(),
-            sd_date = sd(mean_box/sqrt(n())))
+            sd_date = sd(mean_box),
+            se_date = sd(mean_box/sqrt(n())))
 
 ##### 
 
@@ -384,7 +385,7 @@ relative_onset_hatching <- ggplot(data = data,
             size = 4,
             color = "black") 
 
-ggsave(filename = "./plots/Figure S5a.png", 
+ggsave(filename = "./plots/Figure A5a.png", 
        plot = relative_onset_hatching, 
        device = "png", 
        units = "mm",

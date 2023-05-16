@@ -6,7 +6,7 @@
 #' Womack, et al. 
 #' Preprint: 10.1101/2022.07.01.498449v1
 #' 
-#' Latest update: 2023-02-28
+#' Latest update: 2023-05-16
 #' 
 ###
 ###
@@ -405,7 +405,7 @@ drop1(full_failure, test = "Chisq")
 
 ##
 ##
-##### Table of results S6 #####
+##### Table of results A6 #####
 ##
 ##
 
@@ -450,7 +450,7 @@ table_fledglings_failure <- table_fledglings_failure00 %>%
 
 ##
 ## save table
-gtsave(table_fledglings_failure, "./tables/TABLE S6.html")
+gtsave(table_fledglings_failure, "./tables/TABLE A6.html")
 
 #####
 
@@ -493,7 +493,7 @@ normality <- check_normality(full_fledglings_no0)
 hist <- plot(normality)
 qqplot <- plot(normality, type = "qq")
 
-## saving plots
+## saving plots for reviewers
 ggsave(filename = "./plots/fledging_model_normality.png", 
        plot = hist, 
        height = 100, 
@@ -516,7 +516,7 @@ ggsave(filename = "./plots/fledging_model_normality_qq.png",
 
 ##
 ##
-##### Table of results S7 #####
+##### Table of results A7 #####
 ##
 ##
 
@@ -561,13 +561,13 @@ table_fledglings_no0 <- table_fledglings_no000 %>%
 
 ##
 ## save table
-gtsave(table_fledglings_no0, "./tables/TABLE S7.html")
+gtsave(table_fledglings_no0, "./tables/TABLE A7.html")
 
 #####
 
 ##
 ##
-##### Models for number of fledglings against absolute chronotype and Table S5 #####
+##### Models for number of fledglings against absolute chronotype and Table A5 #####
 ##
 ##
 full_fledge_abs_chr_model <- glmer(fledglings ~
@@ -586,7 +586,7 @@ full_fledge_abs_chr_model <- glmer(fledglings ~
 summary(full_fledge_abs_chr_model)
 
 ##
-## Table of results S5
+## Table of results A5
 
 ## base table
 table_fledglings_abs_chr00 <- full_fledge_abs_chr_model %>%
@@ -629,7 +629,7 @@ table_fledglings_abs_chr <- table_fledglings_abs_chr00 %>%
 
 ##
 ## save table
-gtsave(table_fledglings_abs_chr, "./tables/TABLE S5.html")
+gtsave(table_fledglings_abs_chr, "./tables/TABLE A5.html")
 
 #####
 
