@@ -1,7 +1,5 @@
 [![DOI](https://zenodo.org/badge/508356105.svg)](https://zenodo.org/badge/latestdoi/508356105)
 
-10.5281/zenodo.7967106
-
 # Reproductive fitness is associated with female chronotype in a songbird
 
 This repository contains materials used for a project investigating incubation in female great tits, incubation chronotype and the association between chronotype and reproductive success.
