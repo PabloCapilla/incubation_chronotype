@@ -1,0 +1,40 @@
+cff-version: 1.1.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: Womack J
+    given-names: Robyn
+  - family-names: Capilla-Lasheras
+    given-names: Pablo
+  - family-names: McGlade
+    given-names: Ciara L O
+  - family-names: Dominoni
+    given-names: Davide M
+  - family-names: Helm
+    given-names: Barbara
+title: "Reproductive fitness is associated with female chronotype in a songbird"
+version: v1.0
+doi: 10.5281/zenodo.7967054
+date-released: 2023-05-24
+url: "https://github.com/PabloCapilla/incubation_chronotype"
+preferred-citation:
+  type: article
+  authors:
+  - family-names: Womack J
+    given-names: Robyn
+  - family-names: Capilla-Lasheras
+    given-names: Pablo
+  - family-names: McGlade
+    given-names: Ciara L O
+  - family-names: Dominoni
+    given-names: Davide M
+  - family-names: Helm
+    given-names: Barbara
+  doi: "10.0000/00000"
+  journal: "Animal Behaviour"
+  month: 
+  start: 
+  end: 
+  title: "Reproductive fitness is associated with female chronotype in a songbird"
+  issue: 
+  volume: 
+  year: 2023
